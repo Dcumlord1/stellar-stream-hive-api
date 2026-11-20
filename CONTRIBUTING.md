@@ -77,6 +77,10 @@ npm run build
     `description` is required too: it is the figure's alt text, shown after an
     em-dash, and `npm run check-figures` fails the build when it is missing or
     empty.
+  - `<Details summary="...">` wraps long optional reference material (full
+    JSON responses, edge cases) in a block that is collapsed by default. It is
+    available globally and uses the native `<details>`/`<summary>` elements
+    (`components/Details.tsx`). Add `open` to start it expanded.
   - Fenced code blocks (` ```typescript `, ` ```rust `, ` ```bash `, etc.) are
     automatically rendered through `components/CodeBlock.tsx` with a language
     label and copy button -- no need to wrap them in anything yourself.
