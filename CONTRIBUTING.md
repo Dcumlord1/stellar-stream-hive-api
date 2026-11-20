@@ -73,8 +73,10 @@ npm run build
     the top of an API reference section (`components/ApiEndpoint.tsx`).
   - `<Figure title="..." description="...">` wraps inline SVG diagrams with a
     visible caption and an accessible label (`components/Figure.tsx`). It is
-    available globally — no import needed. `title` is required; `description`
-    is optional and shown after an em-dash.
+    available globally — no import needed. `title` is required, and
+    `description` is required too: it is the figure's alt text, shown after an
+    em-dash, and `npm run check-figures` fails the build when it is missing or
+    empty.
   - Fenced code blocks (` ```typescript `, ` ```rust `, ` ```bash `, etc.) are
     automatically rendered through `components/CodeBlock.tsx` with a language
     label and copy button -- no need to wrap them in anything yourself.

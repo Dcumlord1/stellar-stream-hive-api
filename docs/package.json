@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "check-links": "node scripts/check-links.mjs"
+    "check-links": "node scripts/check-links.mjs",
+    "check-figures": "node scripts/check-figures.mjs"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.0.1",
