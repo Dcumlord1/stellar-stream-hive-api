@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "check-links": "node scripts/check-links.mjs",
-    "check-figures": "node scripts/check-figures.mjs"
+    "check-figures": "node scripts/check-figures.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.0.1",
@@ -23,6 +24,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.1",
     "@tailwindcss/typography": "^0.5.15",
     "@types/mdx": "^2.0.13",
     "@types/node": "^20.14.15",
