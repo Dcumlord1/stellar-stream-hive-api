@@ -94,4 +94,8 @@ export const nav: NavGroup[] = [
       },
     ],
   },
+  {
+    title: "Resources",
+    items: [{ title: "Links and Resources", href: "/docs/resources" }],
+  },
 ];
