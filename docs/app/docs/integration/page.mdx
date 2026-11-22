@@ -132,12 +132,60 @@ const allForRecipient = await fetchAll<StreamView>(
 );
 ```
 
+### Browser example
+
+The same paging loop in plain browser JavaScript, with no build step or
+dependencies. It requests a list endpoint with `limit`/`offset`, reads
+`X-Total-Count` from the response headers, and keeps loading pages until every
+item has been collected:
+
+```javascript
+async function fetchAllStreams(baseUrl, path, limit = 200) {
+  const items = [];
+  let offset = 0;
+
+  while (true) {
+    const separator = path.includes("?") ? "&" : "?";
+    const res = await fetch(
+      `${baseUrl}${path}${separator}limit=${limit}&offset=${offset}`,
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(
+        `${res.status} ${body.error ?? "unknown_error"}: ${body.message ?? res.statusText}`,
+      );
+    }
+
+    const page = await res.json();
+    items.push(...page);
+    offset += page.length;
+
+    const totalHeader = res.headers.get("X-Total-Count");
+    const total = totalHeader === null ? null : Number(totalHeader);
+
+    // Stop on a short page, or once we've seen everything the server counted.
+    if (page.length < limit) break;
+    if (total !== null && offset >= total) break;
+  }
+
+  return items;
+}
+
+// Example: every stream paying a given recipient, across all pages.
+const streams = await fetchAllStreams(
+  "http://localhost:8080",
+  `/recipients/${encodeURIComponent("GABC...XYZ")}`,
+);
+```
+
 <CalloutBox variant="info" title="Reading X-Total-Count in the browser">
   Browsers only expose a response header to JavaScript if the server lists it
   in `Access-Control-Expose-Headers`. The API already sets
   `Access-Control-Expose-Headers: X-Total-Count`, so `res.headers.get("X-Total-Count")`
   works from a browser origin. If you proxy the API through your own backend,
-  make sure that proxy forwards the header too.
+  make sure that proxy forwards the header too. See
+  [API Overview: CORS](/docs/api/overview#cors) for the full set of
+  cross-origin headers the API sends.
 </CalloutBox>
 
 <CalloutBox variant="warning" title="Don't do arithmetic on these fields as numbers">
@@ -265,114 +313,10 @@ on the API for this value, you can fetch the latest ledger from Horizon or call
 `getLatestLedger` on the Soroban RPC server directly -- both are authoritative
 and give you the same ledger sequence number.
 
-## Deriving `status` client-side
+## Event wire format
 
-The API's `status` field is derived, not stored. If you are working from
-contract reads instead of the indexer, you can compute the same value from the
-`Stream` fields. The rules match the contract's `compute_status` and the
-[Streams reference](/docs/reference/streams):
-
-- `cancelled` is terminal -- once the flag is set, the status is `cancelled`
-  regardless of the ledger.
-- `currentLedger < start_ledger` &rarr; `pending`.
-- `start_ledger <= currentLedger < end_ledger` &rarr; `active`.
-- `currentLedger >= end_ledger` &rarr; `completed`.
-
-```typescript
-type StreamStatus = "pending" | "active" | "completed" | "cancelled";
-
-interface StreamFields {
-  cancelled: boolean;
-  start_ledger: number;
-  end_ledger: number;
-}
-
-/**
- * Mirrors the contract's compute_status. `currentLedger` is the latest ledger
- * sequence number (from GET /ready, Horizon, or Soroban RPC getLatestLedger).
- */
-function computeStatus(stream: StreamFields, currentLedger: number): StreamStatus {
-  if (stream.cancelled) return "cancelled";
-  if (currentLedger < stream.start_ledger) return "pending";
-  if (currentLedger < stream.end_ledger) return "active";
-  return "completed";
-}
-```
-
-<CalloutBox variant="info" title="Cancelled vs. completed">
-  A stream that was cancelled after it had already reached `end_ledger` still
-  reports `cancelled`, because the flag is terminal. Check `cancelled` first,
-  as the function above does.
-</CalloutBox>
-
-## Reading events directly from Soroban RPC
-
-If you don't want to depend on the indexer, you can read contract events
-yourself with the Soroban RPC `getEvents` method. This example targets
-**testnet**; substitute the RPC URL and contract id for the network and
-deployment you are using.
-
-```typescript
-const RPC_URL = "https://soroban-testnet.stellar.org";
-const STREAM_CONTRACT_ID = "C..."; // the Stream contract id for your deployment
-
-// startLedger must be within the RPC's retention window. Use the latest
-// ledger (or a recent one) to start, then page forward with the cursor.
-const request = {
-  jsonrpc: "2.0",
-  id: 1,
-  method: "getEvents",
-  params: {
-    startLedger: 0, // replace with a recent ledger; see the retention note below
-    filters: [
-      {
-        type: "contract",
-        contractIds: [STREAM_CONTRACT_ID],
-        // Optional: narrow to specific topics, e.g. only "withdraw" events.
-        // Each entry is an ScVal in base64 XDR; "*" matches any value.
-        topics: [["*"]],
-      },
-    ],
-    pagination: { limit: 100 },
-  },
-};
-
-const res = await fetch(RPC_URL, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(request),
-});
-const { result } = await res.json();
-// result.events: array of { type, ledger, contractId, id, topic, value, ... }
-// result.cursor: pass as pagination.cursor in the next request to page forward.
-```
-
-Each event's `topic` and `value` are arrays of base64-encoded XDR `ScVal`s.
-Decode them with `@stellar/stellar-sdk`'s `scValToNative` to get plain JS
-values:
-
-```typescript
-import { scValToNative, xdr } from "@stellar/stellar-sdk";
-
-for (const event of result.events) {
-  // topic[0] is conventionally the event name (e.g. "create", "withdraw").
-  const topics = event.topic.map((t: string) =>
-    scValToNative(xdr.ScVal.fromXDR(t, "base64")),
-  );
-  const data = scValToNative(xdr.ScVal.fromXDR(event.value, "base64"));
-
-  console.log(event.ledger, topics, data);
-}
-```
-
-To page through results, send the next request with
-`pagination: { cursor: result.cursor }` and keep the same `filters`. Stop when
-`result.events` is empty.
-
-<CalloutBox variant="warning" title="RPC retention is limited">
-  Soroban RPC only retains events for a limited ledger window; events older
-  than that window are no longer served by `getEvents`. For historical events
-  -- or to backfill a new integration -- use the indexer API, which keeps the
-  full history. The exact retention window is a property of the RPC provider
-  you use, so check its documentation rather than assuming a fixed value.
-</CalloutBox>
+Contract events arrive from Soroban RPC with their payloads as base64-encoded
+XDR strings, and the indexer decodes them with `ScVal::from_xdr_base64` before
+mapping them onto the stream fields shown above. If you're decoding events
+yourself, see [Glossary: XDR](/docs/concepts/glossary#xdr) for what XDR and
+`ScVal` are and where Stellar documents the format.
