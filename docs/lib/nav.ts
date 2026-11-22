@@ -15,11 +15,8 @@ export const nav: NavGroup[] = [
   {
     title: "Introduction",
     items: [
-      {
-        title: "Getting Started",
-        href: "/docs/getting-started",
-        description: "What payment streaming is, prerequisites, and how to create your first testnet stream.",
-      },
+      { title: "Getting Started", href: "/docs/getting-started" },
+      { title: "Project Status", href: "/docs/status" },
     ],
   },
   {
