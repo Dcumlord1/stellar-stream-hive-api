@@ -128,7 +128,28 @@ because Soroban transactions execute host-function calls sequentially within
 one transaction and contract state changes are only visible/committed as part
 of that same transaction's atomic execution.
 
+## Threat summary
+
+The table below condenses the attacks described above (and the ones the
+per-function auth table covers) into a single view: what is at risk, who
+could attempt it, what the attack looks like, how it is mitigated, and where
+in the contracts that mitigation lives. Each row links to the section on this
+page or the contract function that supports it. None of these mitigations
+have been externally audited -- see the notice at the top of this page.
+
+| Asset | Actor | Attack | Mitigation | Enforced by |
+|---|---|---|---|---|
+| Locked funds | Anyone | Call `vault.release` or `vault.refund` directly, skipping the Stream contract | Caller-identity check against `stored_stream_contract_address` -- see [the caller check](#the-caller-check-the-entire-security-boundary-in-one-sentence) | Vault [`release`](#the-caller-check-the-entire-security-boundary-in-one-sentence) and [`refund`](#the-caller-check-the-entire-security-boundary-in-one-sentence) |
+| Locked funds | Anyone | Deploy a malicious contract impersonating the Stream contract and get the Vault to accept its calls | The stored address is a single, specific contract address set via `set_stream_contract`, not "any stream-like contract" -- see [what an attacker would try](#what-an-attacker-would-try) | Vault [`set_stream_contract`](#auth-requirements-per-function) |
+| Locked funds | Admin | Repoint `set_stream_contract` at an attacker-controlled contract | `admin.require_auth()` against the stored admin, plus one-time setup guidance -- see [what an attacker would try](#what-an-attacker-would-try) | Vault [`set_stream_contract`](#auth-requirements-per-function) |
+| Accounting data | Recipient | Double-withdraw or front-run a `withdraw` to withdraw twice | `withdrawn` is updated atomically before `vault.release` within one transaction -- see [what an attacker would try](#what-an-attacker-would-try) | Stream [`withdraw`](#auth-requirements-per-function) |
+| Accounting data | Sender | Cancel to claw back already-vested funds | `cancellable` check plus the streamed-amount split at cancel time | Stream [`cancel_stream`](#auth-requirements-per-function) |
+| Locked funds | Admin | Pause trapping existing streams | Pause only blocks `create_stream`; it never blocks withdraw or cancel -- see [emergency pause](#emergency-pause) | Stream [`pause` / `unpause`](#emergency-pause) |
+
 ## Auth requirements per function
+
+Checked against `stellar-stream-hive-contract` at commit `33a0840`
+(`contracts/*/src/lib.rs`). Re-check the table if the contracts change.
 
 | Contract | Function | Who may call it | Enforced by |
 |---|---|---|---|
@@ -136,7 +157,7 @@ of that same transaction's atomic execution.
 | Stream | `create_stream` | The intended sender (must authorize the deposit) | `sender.require_auth()` |
 | Stream | `pause` / `unpause` | Stream admin | `admin.require_auth()` against the stored admin |
 | Stream | `transfer_admin` | Current admin and the new admin | `require_auth()` on both addresses |
-| Stream | `withdraw` / `withdraw_max` | The stream's `recipient` | `recipient.require_auth()` |
+| Stream | `withdraw` / `withdraw_max` | The stream's `recipient` | `recipient.require_auth()` in `withdraw`; `withdraw_max` checks the recipient and delegates to `withdraw` |
 | Stream | `cancel_stream` | The stream's `sender`, and only if `cancellable` | `sender.require_auth()` + `cancellable` check |
 | Stream | `streamed_amount` / `withdrawable_amount` / `get_stream` / `get_status` / `get_streams_by_sender` / `get_streams_by_recipient` / `get_streams_by_sender_page` / `get_streams_by_recipient_page` / `count_streams_by_sender` / `count_streams_by_recipient` / `is_paused` / `get_admin` / `get_vault` | Anyone (read-only) | No auth required -- these never move funds or change state |
 | Vault | `initialize` | Deployer, once | `admin.require_auth()` + one-time initialization guard |
@@ -144,10 +165,10 @@ of that same transaction's atomic execution.
 | Vault | `deposit` | Whoever is funding a stream (typically invoked by the Stream contract on the sender's behalf during `create_stream`) | `require_auth()` on the depositing party |
 | Vault | `release` | **The Stream contract only** | Caller-identity check against `stored_stream_contract_address` -- see above |
 | Vault | `refund` | **The Stream contract only** | Same caller-identity check as `release` |
-| Vault | `balance_of_stream` / `total_locked` | Anyone (read-only) | No auth required |
+| Vault | `balance_of_stream` / `total_locked` / `get_stream_contract` / `get_admin` | Anyone (read-only) | No auth required |
 | Registry | `initialize` | Deployer, once | `admin.require_auth()` + one-time initialization guard |
 | Registry | `register_stream` / `update_stream` | Anyone -- intentionally open (see [note](#registry-write-access-is-intentionally-open)) | No caller check; these functions take no caller and the Registry can never move funds |
-| Registry | `get_all_streams` / `get_stats` / `get_active_streams` | Anyone (read-only) | No auth required |
+| Registry | `get_all_streams` / `get_stats` / `get_active_streams` / `get_stream_record` / `get_streams_page` / `stream_count` / `get_admin` | Anyone (read-only) | No auth required |
 
 ### Registry write access is intentionally open
 
@@ -179,73 +200,17 @@ are already streaming can always be withdrawn or cancelled. This is covered by
 ## State archival
 
 Soroban charges for ledger storage through a time-to-live (TTL), measured in
-ledgers. When a contract writes an entry, it extends that entry's TTL so the
-entry stays live for at least a configured number of ledgers. An entry that
-goes untouched for longer than its TTL can be archived by the network. An
-archived entry is not deleted, but the contract cannot read it until it is
-restored.
+ledgers. When the contracts write an entry, they extend its TTL to 241,920
+ledgers, about 14 days at roughly 5 seconds per ledger. An entry that goes
+untouched for longer than its TTL can be archived by the network. An archived
+entry is not deleted, but the contract cannot read it until it is restored.
 
-The TTL logic lives in each contract's `storage.rs` in the
-[stellar-stream-hive-contract](https://github.com/Stellar-Hive/stellar-stream-hive-contract)
-repo. Each contract defines two constants:
+- **What is bumped:** the entries a contract writes. Each write extends that
+  entry's TTL.
+- **Where to look:** the TTL logic is in each contract's `storage.rs`. The
+  Stream contract lives in
+  [stellar-stream-hive-contract](https://github.com/Stellar-Hive/stellar-stream-hive-contract).
 
-- `LEDGER_THRESHOLD` -- the minimum remaining TTL, in ledgers, below which a
-  write triggers a bump. If an entry has more than this many ledgers left, the
-  write leaves its TTL alone.
-- `LEDGER_BUMP` -- the number of ledgers the entry's TTL is extended to when a
-  bump happens.
-
-At roughly 5 seconds per ledger, a ledger count converts to days as
-`ledgers * 5 / 86400`. The exact values of `LEDGER_THRESHOLD` and `LEDGER_BUMP`
-are defined in each contract's `storage.rs`; read them there rather than
-relying on a copy here, since they can change between contract versions.
-
-### Which functions extend which entries
-
-The tables below list, per function, the storage entries whose TTL that
-function extends. "Instance" means the contract instance entry (which holds
-contract-wide config such as the admin address). "Per-stream" means the
-stream record entry keyed by stream ID. "Per-address" means the sender/recipient
-index entries used to enumerate a given address's streams.
-
-**Stream contract**
-
-| Function | Instance | Per-stream | Per-address |
-|---|---|---|---|
-| `initialize` | Extends | -- | -- |
-| `create_stream` | Extends | Extends (new stream) | Extends (sender and recipient indexes) |
-| `withdraw` / `withdraw_max` | Extends | Extends (updated `withdrawn`) | -- |
-| `cancel_stream` | Extends | Extends (updated status) | -- |
-| `pause` / `unpause` | Extends | -- | -- |
-| `transfer_admin` | Extends | -- | -- |
-| Read-only getters | -- | -- | -- |
-
-**Vault contract**
-
-| Function | Instance | Per-stream | Per-address |
-|---|---|---|---|
-| `initialize` | Extends | -- | -- |
-| `set_stream_contract` | Extends | -- | -- |
-| `deposit` | Extends | Extends (per-stream balance) | -- |
-| `release` | Extends | Extends (per-stream balance) | -- |
-| `refund` | Extends | Extends (per-stream balance) | -- |
-| Read-only getters | -- | -- | -- |
-
-**Registry contract**
-
-| Function | Instance | Per-stream | Per-address |
-|---|---|---|---|
-| `initialize` | Extends | -- | -- |
-| `register_stream` | Extends | Extends (new registry entry) | -- |
-| `update_stream` | Extends | Extends (updated registry entry) | -- |
-| Read-only getters | -- | -- | -- |
-
-<CalloutBox variant="warning" title="Verify against the source">
-  The tables above summarize the intent of each contract's `storage.rs`. If a
-  function's behavior differs from this table in the version you are reading,
-  trust the source: the TTL bumps are an implementation detail of the contract
-  and this page is a reading aid, not a specification. Read-only getters do
-  not write, so they never extend a TTL -- which also means a stream that is
-  only ever read (never withdrawn or cancelled) can still be archived once its
-  TTL lapses.
-</CalloutBox>
+For one-line definitions of these terms, see the Glossary entries for
+[TTL](/docs/concepts/glossary#ttl) and
+[Archival](/docs/concepts/glossary#archival).

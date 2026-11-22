@@ -80,10 +80,60 @@ Non-2xx responses return:
 
 | HTTP status | `error` | When |
 |---|---|---|
-| `400` | `bad_request` | A path parameter failed basic validation (e.g. an empty address). |
+| `400` | `bad_request` | A path or limit parameter failed validation (e.g. a malformed address, or `limit` outside `1`-`200`). Its `message` is prefixed with `invalid request: `. Query values the parser cannot read (unknown `status`/`sort`/`order`, non-numeric `limit`/`offset`) return a `400` with a plain-text body instead. |
 | `404` | `not_found` | The requested stream id doesn't exist in the index. |
 | `502` | `upstream_unavailable` | Reserved for future endpoints that proxy live Horizon reads; unused by the current routes, which only ever read already-indexed in-memory state. |
-| `500` | `internal_error` | An unexpected server-side failure (e.g. arithmetic overflow computing aggregate stats). Logged server-side with full detail; the response body never leaks internals. |
+| `500` | `internal_error` | An unexpected server-side failure (e.g. arithmetic overflow computing aggregate stats). Logged server-side with full detail. The response `message` is prefixed with `internal error: ` and includes the error's description, so do not treat it as opaque. |
+
+### Handling errors in a client
+
+Branch on the `error` field rather than on the HTTP status alone, and treat
+`message` as display-ready text for the cases below. Only the kinds in the
+table above are ever returned.
+
+```ts
+type ApiErrorBody = {
+  error: "bad_request" | "not_found" | "internal_error" | "upstream_unavailable";
+  message: string;
+};
+
+type StreamView = { id: string; /* ...other fields... */ };
+
+async function getStream(id: string): Promise<StreamView | null> {
+  const res = await fetch(`http://localhost:8080/streams/${id}`);
+
+  if (res.ok) {
+    return (await res.json()) as StreamView;
+  }
+
+  const body = (await res.json()) as ApiErrorBody;
+
+  switch (body.error) {
+    case "bad_request":
+      // The id failed validation (e.g. an empty address). Show the
+      // server's message next to the input so the user can correct it.
+      throw new ValidationError(body.message);
+
+    case "not_found":
+      // No such stream in the index. Render an empty/not-found state
+      // instead of an error banner.
+      return null;
+
+    case "internal_error":
+      // Unexpected server-side failure. Show a generic message and
+      // offer a retry; never surface the raw body to the user.
+      throw new RetryableError("Something went wrong. Please try again.");
+
+    default:
+      // e.g. upstream_unavailable, reserved for future endpoints.
+      throw new Error(body.message);
+  }
+}
+```
+
+For a browser example that also reads `X-Total-Count` and pages through list
+results cross-origin, see the
+[Integration Guide](/docs/integration#browser-fetch-paging-and-cors).
 
 ### Why `/streams/:id` can 404 even for a real stream id
 
@@ -157,7 +207,9 @@ Streams page for how `limit` and `offset` interact with it.
 `Access-Control-Allow-Origin` defaults to `*` (any origin). Setting
 `CORS_ALLOWED_ORIGINS` to a comma-separated list of origins restricts it to
 only those origins; leaving it unset, or setting it to a lone `*`, means any
-origin. Whitespace and trailing slashes are trimmed from each entry.
+origin. Whitespace and trailing slashes are trimmed from each entry, empty
+entries are dropped, and any entry that is not a valid HTTP header value is
+skipped with a warning rather than aborting startup.
 
 Allowed methods are `GET`, `HEAD`, and `OPTIONS`. Only the `Accept` and
 `Content-Type` request headers are allowed. `X-Total-Count` is exposed to
@@ -173,10 +225,10 @@ request could do here that a same-origin one couldn't.
 | Name | Default | Meaning |
 |---|---|---|
 | `SOROBAN_RPC_URL` | `https://soroban-testnet.stellar.org` | Soroban RPC endpoint the indexer polls for events. |
-| `STREAM_CONTRACT_ID` | _(unset)_ | The Stream contract id to index. Unset means the indexer runs but `/streams` stays empty. |
+| `STREAM_CONTRACT_ID` | _(placeholder -- not a real address)_ | The Stream contract id to index. When unset or left as the placeholder, the indexer runs but `/streams` stays empty. |
 | `BIND_ADDR` | `0.0.0.0:8080` | Address and port the HTTP server binds to. |
-| `POLL_INTERVAL_SECS` | `10` | Seconds between Soroban RPC polls. |
-| `INDEXER_BACKFILL_LEDGERS` | `17280` | How many ledgers back the indexer starts from on boot. |
+| `POLL_INTERVAL_SECS` | `10` | Seconds between Soroban RPC polls. A non-integer value is ignored and the default is used. |
+| `INDEXER_BACKFILL_LEDGERS` | `17280` | How many ledgers back the indexer starts from on boot. A non-integer value is ignored and the default is used. |
 | `CORS_ALLOWED_ORIGINS` | _(unset -- any origin)_ | Comma-separated list of allowed origins; unset or `*` means any origin. |
 | `RUST_LOG` | `info` | Log filter for the service (e.g. `debug`, `info`, `warn`). |
 
