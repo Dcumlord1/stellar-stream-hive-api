@@ -49,7 +49,7 @@ Every stream object returned by these endpoints has this shape:
 | `status` | string | One of `"pending"`, `"active"`, `"completed"`, `"cancelled"`. |
 | `created_at` | number | Unix timestamp (seconds). |
 | `streamed_amount` / `withdrawable_amount` | string (i128) | Computed live -- see [Streaming Math](/docs/concepts/streaming-math). |
-| `progress_percent` | number | Integer 0-100, `streamed_amount / total_amount * 100`, rounded down. |
+| `progress_percent` | number | Integer 0-100, `streamed_amount / total_amount * 100`, rounded down. `0` when `total_amount` is `0`. |
 
 ## Contract `Stream` vs API `Stream`
 
@@ -135,12 +135,74 @@ curl -s "http://localhost:8080/streams?status=active&limit=20" \
   in `jq`.
 </CalloutBox>
 
+### Pagination recipes
+
+Each list request is a **snapshot** taken when the request is served. If new
+streams are created between two requests, the underlying list changes and
+`offset`-based pages can shift -- a stream you already saw may appear again on
+the next page, or one may be skipped. The recipes below show the common
+patterns; for a fully consistent walk, re-fetch from `offset=0` or page by a
+stable key (the default `sort=id` with numeric-id tie-breaking keeps ordering
+deterministic within a single snapshot).
+
+**1. Load more -- fetch the next page.** Keep the page size fixed and increase
+`offset` by it each time:
+
+```bash
+PAGE_SIZE=20
+OFFSET=0
+
+# First page
+curl -s "http://localhost:8080/streams?limit=$PAGE_SIZE&offset=$OFFSET" | jq -r '.[].id'
+
+# Next page: offset += page size
+OFFSET=$((OFFSET + PAGE_SIZE))
+curl -s "http://localhost:8080/streams?limit=$PAGE_SIZE&offset=$OFFSET" | jq -r '.[].id'
+```
+
+**2. Jump to the last page.** Read `X-Total-Count` from the response headers,
+then compute the final offset from it:
+
+```bash
+PAGE_SIZE=20
+
+TOTAL=$(curl -s -D - -o /dev/null \
+  "http://localhost:8080/streams?limit=$PAGE_SIZE&offset=0" \
+  | awk 'tolower($1) == "x-total-count:" { print $2 }' | tr -d '\r')
+
+# Offset of the final page (0 when the list is empty)
+LAST_OFFSET=$(( TOTAL > 0 ? ((TOTAL - 1) / PAGE_SIZE) * PAGE_SIZE : 0 ))
+
+curl -s "http://localhost:8080/streams?limit=$PAGE_SIZE&offset=$LAST_OFFSET" | jq -r '.[].id'
+```
+
+**3. Parallel fetch -- several pages at once.** Issue multiple offset requests
+concurrently and merge the arrays. Because each request is its own snapshot,
+the merged result is only as consistent as the moment each request was served:
+
+```bash
+PAGE_SIZE=20
+
+for OFFSET in 0 20 40; do
+  curl -s "http://localhost:8080/streams?limit=$PAGE_SIZE&offset=$OFFSET" \
+    > "/tmp/streams-page-$OFFSET.json" &
+done
+wait
+
+jq -s 'add' /tmp/streams-page-*.json | jq -r '.[].id'
+```
+
 ### Effective status
 
 The indexer only observes three on-chain events (`create`, `withdraw`,
 `cancel`), so it cannot be *told* when a stream moves from pending to
 active or from active to completed -- that happens purely because ledgers
-pass. The API derives it on every read from the latest ledger it has seen:
+pass. The API derives it on every read from the latest ledger it has seen.
+This derived value is the **effective status**; the `status` stored by the
+indexer is only the last status an observed event implied, and can be stale
+until the next read recomputes it. See
+[Effective status](/docs/concepts/glossary#effective-status) in the glossary
+for the stored-versus-effective distinction.
 
 | Condition | `status` |
 |---|---|
@@ -178,15 +240,16 @@ been created yet, or `STREAM_CONTRACT_ID` isn't configured yet (see
 
 **Errors:**
 
-- `400 bad_request` -- an invalid query parameter:
-  - `limit` of `0` or greater than `200`
-  - an unknown `status` value
-  - an unknown `sort` value
-  - an unknown `order` value
+- `400` -- an invalid query parameter:
+  - `limit` of `0` or greater than `200` (JSON body with `error: "bad_request"`)
+  - an unknown `status`, `sort` or `order` value, or a non-numeric `limit` or
+    `offset` (these are rejected by the query parser before the handler runs,
+    so the body is plain text rather than the JSON error envelope)
 - `500 internal_error` only if computing a stream's live view fails
   unexpectedly (e.g. arithmetic overflow) -- not expected in normal operation.
 
-Example `400` response body:
+Example `400` response body (the `message` is the server's error text prefixed
+with `invalid request: `):
 
 ```bash
 curl -i "http://localhost:8080/streams?limit=0"
@@ -195,7 +258,35 @@ curl -i "http://localhost:8080/streams?limit=0"
 ```json
 {
   "error": "bad_request",
-  "message": "limit must be between 1 and 200"
+  "message": "invalid request: limit must be at least 1"
+}
+```
+
+**Unknown `status`** (anything outside `pending`, `active`, `completed`,
+`cancelled`):
+
+```bash
+curl -i "http://localhost:8080/streams?status=done"
+```
+
+```json
+{
+  "error": "bad_request",
+  "message": "invalid status"
+}
+```
+
+**Bad address** on `/senders/:address` or `/recipients/:address` (not a
+well-formed `G...` account or `C...` contract strkey):
+
+```bash
+curl -i "http://localhost:8080/senders/not-a-strkey"
+```
+
+```json
+{
+  "error": "bad_request",
+  "message": "invalid address"
 }
 ```
 
@@ -210,6 +301,8 @@ curl -i "http://localhost:8080/streams?limit=0"
 ```bash
 curl http://localhost:8080/streams/1
 ```
+
+<Details summary="Example response (full JSON)">
 
 ```json
 {
@@ -231,6 +324,8 @@ curl http://localhost:8080/streams/1
 }
 ```
 
+</Details>
+
 **Errors:**
 
 - `404 not_found` -- no stream with this id is known to the indexer (see the
@@ -247,8 +342,12 @@ curl http://localhost:8080/streams/1
 | `address` | path | string | A Stellar strkey: either a `G...` account or a `C...` contract address. |
 
 ```bash
-curl http://localhost:8080/senders/GABC...XYZ
+curl http://localhost:8080/senders/GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF
 ```
+
+The address above is the all-zero account key: a well-formed `G...` strkey
+that no stream uses, so the call returns `[]`. Substitute a real account or
+contract address to list actual streams.
 
 Returns a JSON array of [stream view](#stream-view-shape) objects where
 `sender` matches `address` -- shape identical to `GET /streams`, just
@@ -297,8 +396,8 @@ Example response (one active stream, one cancelled stream):
 ```
 
 **Errors:** `400 bad_request` if `address` is not a well-formed strkey --
-either a `G...` account or a `C...` contract address. This includes an empty
-address (e.g. a malformed path like `/senders/`) and any malformed value.
+either a `G...` account or a `C...` contract address. Any malformed value is
+rejected this way.
 
 ```bash
 curl -i http://localhost:8080/senders/not-a-strkey
@@ -307,10 +406,9 @@ curl -i http://localhost:8080/senders/not-a-strkey
 ```json
 {
   "error": "bad_request",
-  "message": "invalid address"
+  "message": "invalid request: 'not-a-strkey' is not a valid Stellar account (G...) or contract (C...) address"
 }
 ```
-
 ## `GET /recipients/:address`
 
 <ApiEndpoint method="GET" path="/recipients/:address" description="Every stream received by a given address." />
@@ -319,7 +417,7 @@ Identical to `GET /senders/:address` in every respect except that it filters
 on `recipient` instead of `sender`.
 
 ```bash
-curl http://localhost:8080/recipients/GDEF...UVW
+curl http://localhost:8080/recipients/GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF
 ```
 
 Example response (one active stream, one cancelled stream):
@@ -364,8 +462,8 @@ Example response (one active stream, one cancelled stream):
 ```
 
 **Errors:** `400 bad_request` if `address` is not a well-formed strkey --
-either a `G...` account or a `C...` contract address. This includes an empty
-address and any malformed value.
+either a `G...` account or a `C...` contract address. Any malformed value is
+rejected this way.
 
 ```bash
 curl -i http://localhost:8080/recipients/not-a-strkey
@@ -374,7 +472,7 @@ curl -i http://localhost:8080/recipients/not-a-strkey
 ```json
 {
   "error": "bad_request",
-  "message": "invalid address"
+  "message": "invalid request: 'not-a-strkey' is not a valid Stellar account (G...) or contract (C...) address"
 }
 ```
 

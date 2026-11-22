@@ -1,4 +1,5 @@
 import CalloutBox from "@/components/CalloutBox";
+import Figure from "@/components/Figure";
 
 export const metadata = {
   title: "Web App Guide",
@@ -18,8 +19,9 @@ web app does is privileged or otherwise unavailable to you directly.
 
 ## Connecting Freighter
 
-1. Install the [Freighter](https://www.freighter.app/) browser extension and
-   create or import an account.
+1. Install the [Freighter](/docs/concepts/glossary#freighter) browser
+   extension ([official site](https://www.freighter.app/)) and create or
+   import an account.
 2. In Freighter's network selector, choose **Test Net** to match the web
    app's default network (see [Network Guide](/docs/getting-started#network-guide)
    if you need to point it at a different network).
@@ -29,6 +31,12 @@ web app does is privileged or otherwise unavailable to you directly.
    this step.
 4. Once connected, the app displays your shortened address and the active
    network badge in the header (it does not display a wallet XLM balance).
+
+<Figure
+  src="/web-app-connect.png"
+  alt="The web app header after connecting Freighter, showing a shortened wallet address and the active network badge."
+  caption="After approving the connection in Freighter, the header shows your shortened address and the active network badge."
+/>
 
 <CalloutBox variant="info">
   If your testnet account has no funds yet, use
@@ -55,7 +63,7 @@ web app does is privileged or otherwise unavailable to you directly.
      though accrual has started. Leave blank for no cliff.
    - **Cancellable** -- whether you (the sender) can cancel this stream
      later. This cannot be changed after creation.
-3. Click **Create Stream**. Freighter will prompt you to sign the
+3. Click **Create stream**. Freighter will prompt you to sign the
    `create_stream` transaction. This is the only signature required to fund
    the entire stream -- no separate token approval (`approve`) transaction is
    signed; instead, `create_stream` invokes the [Vault contract's `deposit`](/docs/contracts/vault#deposit)
@@ -68,6 +76,12 @@ web app does is privileged or otherwise unavailable to you directly.
    but nothing is withdrawable until the cliff ledger is reached),
    **Completed**, or **Cancelled**.
 
+<Figure
+  src="/web-app-create.png"
+  alt="The Create Stream form with recipient, token, amount, start, end, optional cliff, and cancellable fields filled in."
+  caption="The Create Stream form: recipient, token, amount, start and end dates, an optional cliff, and the cancellable toggle."
+/>
+
 ### Custom token detection
 
 When you enter a token contract address, the app reads the token's `symbol()`
@@ -75,7 +89,7 @@ and `decimals()` from the contract to display a friendly token name and to
 convert your amount into the token's smallest unit. If the contract does not
 expose those functions (or the call fails), the app falls back to manual
 entry: you supply the symbol and decimals yourself, and the form shows a
-warning that the values could not be auto-detected. Double-check the decimals
+warning that it couldn't read the token's details. Double-check the decimals
 you enter in that case -- the app trusts them for the conversion.
 
 <CalloutBox variant="warning" title="Wrong decimals change how much is deposited">
@@ -121,6 +135,12 @@ figures:
 - **Withdrawable** -- what the recipient could withdraw right now
   (`withdrawable_amount`).
 
+<Figure
+  src="/web-app-balance.png"
+  alt="A stream detail page showing the live progress bar with Streamed and Withdrawable figures."
+  caption="A stream's detail page: the progress bar and the live Streamed and Withdrawable figures update once per second."
+/>
+
 Rather than polling the indexer API on every tick, the web app computes the
 live balance client-side in `useLiveBalance`: it fetches the latest ledger
 sequence and close timestamp from the network, ticks once per second by
@@ -158,12 +178,18 @@ From a stream's detail page, the recipient sees a **Withdraw** button:
 3. Once confirmed, the withdrawn amount lands in your wallet immediately, and
    **Withdrawable** resets toward `0` (climbing again as more time passes).
 
+<Figure
+  src="/web-app-withdraw.png"
+  alt="The Withdraw dialog with Max withdrawable selected and a Confirm withdrawal button."
+  caption="The Withdraw dialog: choose Max withdrawable or enter a custom amount, then confirm and sign in Freighter."
+/>
+
 ## Cancelling a stream
 
 Only visible to the sender, and only when the stream was created with
 **Cancellable** set to true:
 
-1. From the stream's detail page, click **Cancel Stream**.
+1. From the stream's detail page, click **Cancel stream**.
 2. The app shows a confirmation with the exact split that will occur --
    how much the recipient will keep (everything streamed so far) and how much
    will be refunded back to you -- computed via

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { MDXComponents } from "mdx/types";
 
 import CodeBlock from "@/components/CodeBlock";
+import Details from "@/components/Details";
 import Figure from "@/components/Figure";
 import StreamingCalculator from "@/components/StreamingCalculator";
 
@@ -10,9 +11,8 @@ import StreamingCalculator from "@/components/StreamingCalculator";
  * are intentionally *not* included here -- pages import them explicitly since
  * they take props (variant, method, path) that a blanket override can't supply.
  * `Figure` is exported here so diagrams have a consistent accessible wrapper
- * without an explicit import on every page. `StreamingCalculator` is exported
- * here so the streaming-math page can embed the interactive calculator without
- * an explicit import.
+ * without an explicit import on every page. `Details` is exported here too, for
+ * collapsible reference blocks.
  */
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {
@@ -38,7 +38,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
       </div>
     ),
     Figure,
-    StreamingCalculator,
+    Details,
     ...components,
   };
 }
