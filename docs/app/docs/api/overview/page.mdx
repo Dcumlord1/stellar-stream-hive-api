@@ -135,6 +135,33 @@ For a browser example that also reads `X-Total-Count` and pages through list
 results cross-origin, see the
 [Integration Guide](/docs/integration#browser-fetch-paging-and-cors).
 
+### Handling errors in clients
+
+Every non-2xx response uses the same `{ error, message }` shape. A TypeScript
+client can branch on the `error` kind to show the user an actionable message:
+
+```ts
+interface ApiErrorBody {
+  error: string;
+  message: string;
+}
+
+function userFacingMessage(body: ApiErrorBody, status: number): string {
+  switch (body.error) {
+    case "not_found":
+      return "That stream could not be found.";
+    case "bad_request":
+      return `Invalid request: ${body.message}`;
+    case "upstream_unavailable":
+      return "The indexer is temporarily unavailable. Try again later.";
+    case "internal_error":
+      return "Something went wrong on the server. Please retry.";
+    default:
+      return `Unexpected error (${status}): ${body.message}`;
+  }
+}
+```
+
 ### Why `/streams/:id` can 404 even for a real stream id
 
 <CalloutBox variant="info">
