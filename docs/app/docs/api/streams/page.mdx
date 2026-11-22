@@ -49,7 +49,7 @@ Every stream object returned by these endpoints has this shape:
 | `status` | string | One of `"pending"`, `"active"`, `"completed"`, `"cancelled"`. |
 | `created_at` | number | Unix timestamp (seconds). |
 | `streamed_amount` / `withdrawable_amount` | string (i128) | Computed live -- see [Streaming Math](/docs/concepts/streaming-math). |
-| `progress_percent` | number | Integer 0-100, `streamed_amount / total_amount * 100`, rounded down. |
+| `progress_percent` | number | Integer 0-100, `streamed_amount / total_amount * 100`, rounded down. `0` when `total_amount` is `0`. |
 
 ## Filtering and pagination
 
@@ -152,7 +152,8 @@ been created yet, or `STREAM_CONTRACT_ID` isn't configured yet (see
 - `500 internal_error` only if computing a stream's live view fails
   unexpectedly (e.g. arithmetic overflow) -- not expected in normal operation.
 
-Example `400` response body:
+Example `400` response body (the `message` is the server's error text prefixed
+with `invalid request: `):
 
 ```bash
 curl -i "http://localhost:8080/streams?limit=0"
@@ -243,7 +244,6 @@ curl -i http://localhost:8080/senders/not-a-strkey
   "message": "invalid request: 'not-a-strkey' is not a valid Stellar account (G...) or contract (C...) address"
 }
 ```
-
 ## `GET /recipients/:address`
 
 <ApiEndpoint method="GET" path="/recipients/:address" description="Every stream received by a given address." />
