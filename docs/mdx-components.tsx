@@ -4,6 +4,7 @@ import type { MDXComponents } from "mdx/types";
 import CodeBlock from "@/components/CodeBlock";
 import Details from "@/components/Details";
 import Figure from "@/components/Figure";
+import StreamingCalculator from "@/components/StreamingCalculator";
 
 /**
  * Global overrides applied to every MDX doc page. `CalloutBox` and `ApiEndpoint`
