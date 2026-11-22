@@ -30,7 +30,7 @@ curl http://localhost:8080/stats
 |---|---|---|
 | `total_streams` | number | Count of every stream the indexer has observed, in any status. |
 | `active_streams` | number | Count currently in `active` status (`pending` streams are not counted -- see note below). |
-| `total_streamed` | string (i128) | Sum of `streamed_amount` across every stream, computed live at the indexer's latest known ledger. |
+| `total_streamed` | string (i128) | Sum of `streamed_amount` across every stream. For active and pending streams this is computed live at the indexer's latest known ledger; for cancelled streams it is frozen at the value recorded in the cancel event. |
 | `total_withdrawn` | string (i128) | Sum of `withdrawn` across every stream. |
 | `total_value_locked` | string (i128) | Funds the vault still holds for streams: `total_amount - withdrawn` for pending, active and completed streams, and only the recipient's unclaimed share (`streamed_now - withdrawn`) for cancelled ones, since the remainder was refunded to the sender. |
 
