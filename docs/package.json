@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "check-links": "node scripts/check-links.mjs",
+    "check-external-links": "node scripts/check-external-links.mjs",
     "check-nav": "node scripts/check-nav.mjs",
     "check-metadata": "node scripts/check-metadata.mjs",
     "test:unit": "node --test scripts/__tests__"
