@@ -52,6 +52,8 @@ Before opening a PR, confirm the site still builds cleanly:
 
 ```bash
 npm run build
+npm run check-links
+npm run lint
 ```
 
 ## MDX conventions
@@ -119,6 +121,8 @@ in the PR description. A maintainer will point you to the right place.
 - [ ] Changes are entirely within `docs/` (or this `CONTRIBUTING.md`/root
       `README.md`, for meta changes).
 - [ ] `npm run build` succeeds in `docs/`.
+- [ ] `npm run check-links` succeeds in `docs/`.
+- [ ] `npm run lint` succeeds in `docs/`.
 - [ ] New pages are added to `docs/lib/nav.ts`.
 - [ ] Internal links resolve (no typos in paths).
 - [ ] No fabricated contract addresses, deployment details, or numeric claims.

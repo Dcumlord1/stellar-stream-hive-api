@@ -6,6 +6,8 @@
 
 - [ ] Changes are entirely within `docs/` (or the root `README.md` / `CONTRIBUTING.md`, for meta changes).
 - [ ] `npm run build` succeeds in `docs/`.
+- [ ] `npm run check-links` succeeds in `docs/`.
+- [ ] `npm run lint` succeeds in `docs/`.
 - [ ] New pages are added to `docs/lib/nav.ts`.
 - [ ] Internal links resolve (no typos in paths or anchors).
 - [ ] No fabricated contract addresses, deployment details, or numeric claims.
