@@ -77,6 +77,11 @@ export const nav: NavGroup[] = [
         href: "/docs/api/stats",
         description: "GET /stats -- aggregate totals across every indexed stream.",
       },
+      {
+        title: "Indexer Architecture",
+        href: "/docs/api/indexer-architecture",
+        description: "How the indexer polls Soroban RPC, decodes events, and keeps its in-memory state up to date: backfill vs. cursor resume, the per-tick call cap, and decoding.",
+      },
     ],
   },
   {
