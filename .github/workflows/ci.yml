@@ -42,6 +42,7 @@ jobs:
           cache: npm
           cache-dependency-path: docs/package-lock.json
       - run: npm ci
+      - run: npm run lint:md
       - run: npm run build
       - run: npm run check-links
       - run: npm run check-nav

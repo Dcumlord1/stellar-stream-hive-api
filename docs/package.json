@@ -10,7 +10,8 @@
     "lint": "next lint",
     "check-links": "node scripts/check-links.mjs",
     "check-nav": "node scripts/check-nav.mjs",
-    "check-metadata": "node scripts/check-metadata.mjs"
+    "check-metadata": "node scripts/check-metadata.mjs",
+    "lint:md": "markdownlint-cli2 \"**/*.{md,mdx}\" \"#node_modules\" \"#.next\""
   },
   "dependencies": {
     "@mdx-js/loader": "^3.0.1",
@@ -35,6 +36,7 @@
     "eslint-config-next": "14.2.35",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "markdownlint-cli2": "^0.14.0"
   }
 }
