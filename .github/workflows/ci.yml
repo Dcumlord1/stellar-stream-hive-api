@@ -64,3 +64,7 @@ jobs:
           npx next start -p 3200 &
           npx wait-on http://localhost:3200/docs/getting-started
           npm run a11y
+      - name: Lighthouse CI budgets
+        run: npm run lighthouse
+        env:
+          LHCI_BUILD_CONTEXT__CURRENT_HASH: ${{ github.sha }}

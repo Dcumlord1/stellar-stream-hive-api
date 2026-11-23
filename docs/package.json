@@ -13,7 +13,8 @@
     "check-metadata": "node scripts/check-metadata.mjs",
     "lint:md": "markdownlint-cli2 \"**/*.{md,mdx}\" \"#node_modules\" \"#.next\"",
     "spellcheck": "cspell \"**/*.{md,mdx,ts,tsx}\" --config cspell.json --no-progress",
-    "a11y": "pa11y-ci --config .pa11yci.json"
+    "a11y": "pa11y-ci --config .pa11yci.json",
+    "lighthouse": "lhci autorun"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.0.1",
@@ -42,6 +43,7 @@
     "markdownlint-cli2": "^0.14.0",
     "cspell": "^8.14.4",
     "pa11y-ci": "^3.1.0",
-    "wait-on": "^7.2.0"
+    "wait-on": "^7.2.0",
+    "@lhci/cli": "^0.14.0"
   }
 }
