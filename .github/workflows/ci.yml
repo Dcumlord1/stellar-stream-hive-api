@@ -47,6 +47,14 @@ jobs:
       - run: npm run check-nav
       - run: npm run check-metadata
       - run: npm run lint
+      - name: Dependency audit (fails on high/critical runtime advisories)
+        # --omit=dev so a dev-only advisory (lint tooling, playwright, etc.)
+        # doesn't block CI; those should be triaged separately, not block
+        # the build. If this fails on a false positive or a patch isn't
+        # available yet, either bump the dependency, or temporarily pin an
+        # exception with `npm audit --omit=dev --audit-level=high` run
+        # locally to confirm, documenting why in the PR before merging.
+        run: npm audit --omit=dev --audit-level=high
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
