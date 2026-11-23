@@ -12,7 +12,8 @@
     "check-nav": "node scripts/check-nav.mjs",
     "check-metadata": "node scripts/check-metadata.mjs",
     "lint:md": "markdownlint-cli2 \"**/*.{md,mdx}\" \"#node_modules\" \"#.next\"",
-    "spellcheck": "cspell \"**/*.{md,mdx,ts,tsx}\" --config cspell.json --no-progress"
+    "spellcheck": "cspell \"**/*.{md,mdx,ts,tsx}\" --config cspell.json --no-progress",
+    "a11y": "pa11y-ci --config .pa11yci.json"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.0.1",
@@ -39,6 +40,8 @@
     "tailwindcss": "^3.4.13",
     "typescript": "^5.6.3",
     "markdownlint-cli2": "^0.14.0",
-    "cspell": "^8.14.4"
+    "cspell": "^8.14.4",
+    "pa11y-ci": "^3.1.0",
+    "wait-on": "^7.2.0"
   }
 }

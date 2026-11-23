@@ -59,3 +59,8 @@ jobs:
         run: npm run test:e2e
         env:
           PLAYWRIGHT_SKIP_BUILD: "1"
+      - name: Accessibility check (pa11y)
+        run: |
+          npx next start -p 3200 &
+          npx wait-on http://localhost:3200/docs/getting-started
+          npm run a11y
