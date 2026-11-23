@@ -1,5 +1,8 @@
 # Stellar Stream Hive API + Docs
 
+[![CI](https://github.com/Stellar-Hive/stellar-stream-hive-api/actions/workflows/ci.yml/badge.svg)](https://github.com/Stellar-Hive/stellar-stream-hive-api/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+
 A Rust/Axum REST API that indexes payment-stream activity on Stellar, plus the
 documentation site for the whole Stellar Stream Hive platform (contracts + API
 + web app).
