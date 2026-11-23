@@ -30,6 +30,9 @@ api/    Rust + Axum REST API + Horizon-polling indexer  (maintainer-only, see CO
 docs/   Next.js 14 + TypeScript + Tailwind + MDX documentation site (open to contributions)
 ```
 
+See [`docs/README.md`](docs/README.md) for how to run, build, and contribute
+to the documentation site specifically.
+
 ### `api/`
 
 Polls [Horizon](https://developers.stellar.org/docs/data/horizon) every 10
