@@ -63,6 +63,8 @@ npm run dev
 ## Contributing
 
 **Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.**
+Participation in this project is governed by our
+[Code of Conduct](CODE_OF_CONDUCT.md).
 In short: `docs/` is open to contributions, `api/` is maintainer-only, and PRs
 touching `api/` will be closed without review.
 

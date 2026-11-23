@@ -1,5 +1,8 @@
 # Contributing to Stellar Stream Hive API
 
+By participating in this project you agree to abide by our
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
 > **Scope of this repository: contributors work in `docs/` only.**
 >
 > This repository hosts both the Rust indexer API (`api/`) and its
