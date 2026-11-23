@@ -96,6 +96,95 @@ npm run build
   docs or in `api/src/`. If you're not sure something is still accurate,
   flag it in your PR description rather than guessing.
 
+## Available MDX components
+
+These components are available globally to every `page.mdx` under
+`docs/app/docs/` (no import needed) unless noted otherwise. Source lives in
+`docs/components/`.
+
+- **`CalloutBox`** (`CalloutBox.tsx`) -- a styled note/warning/tip box.
+  `variant` is one of `"info" | "warning" | "success" | "danger"`.
+
+  ```mdx
+  <CalloutBox variant="warning">
+    Withdrawals before the cliff ledger always return zero, even if funds
+    have technically streamed.
+  </CalloutBox>
+  ```
+
+- **`ApiEndpoint`** (`ApiEndpoint.tsx`) -- a labeled header for an API
+  reference section. Place it at the top of the section it describes.
+
+  ```mdx
+  <ApiEndpoint
+    method="GET"
+    path="/streams/:id"
+    description="Fetch the current state of a single stream by its on-chain ID."
+  />
+  ```
+
+- **`Figure`** (`Figure.tsx`) -- wraps an inline SVG diagram with a visible
+  caption and an accessible label. Both `title` and `description` are
+  required; `description` becomes the figure's alt text (shown after an
+  em-dash) and `npm run check-figures` fails the build if it's missing or
+  empty.
+
+  ```mdx
+  <Figure title="Linear accrual over time" description="A straight line from zero at the start ledger to the total amount at the end ledger.">
+    <svg viewBox="0 0 200 100">{/* diagram */}</svg>
+  </Figure>
+  ```
+
+- **`Details`** (`Details.tsx`) -- a collapsed-by-default `<details>`/
+  `<summary>` block for optional reference material (full JSON responses,
+  edge cases). Add the `open` attribute to start it expanded.
+
+  ```mdx
+  <Details summary="Full JSON response">
+    ```json
+    { "id": "stream_123", "status": "active" }
+    ```
+  </Details>
+  ```
+
+- **Fenced code blocks** render through `CodeBlock.tsx` automatically -- just
+  use normal Markdown fences with a language tag; you get a language label
+  and a copy button for free.
+
+  ```mdx
+  \`\`\`typescript
+  const client = new StreamHiveClient();
+  \`\`\`
+  ```
+
+- **`StreamingCalculator`** (`StreamingCalculator.tsx`) -- an interactive,
+  client-side calculator for the streamed/withdrawable amount formula. Takes
+  no props; all state is internal. Drop it into a concepts page where the
+  accrual formula is explained.
+
+  ```mdx
+  <StreamingCalculator />
+  ```
+
+- **`DateToLedgerConverter`** (`DateToLedgerConverter.tsx`) -- an interactive
+  converter that estimates a ledger sequence from a target date, assuming a
+  5-second ledger close time. Takes no props.
+
+  ```mdx
+  <DateToLedgerConverter />
+  ```
+
+- **`TechArticleJsonLd`** (`TechArticleJsonLd.tsx`) -- emits `TechArticle`
+  JSON-LD structured data for the current page, derived from its entry in
+  `docs/lib/nav.ts`. It's rendered once per page by the shared layout, not
+  something you add to individual `.mdx` files.
+
+Not every component in `docs/components/` is meant for page content --
+`EditOnGitHub.tsx`, `PageNav.tsx`, `Sidebar.tsx`, `SiteHeader.tsx`,
+`ThemeToggle.tsx`, and `Toc.tsx` are part of the site chrome (header,
+sidebar, table of contents, theme switch) and are wired up by the layout,
+not used inside `page.mdx` files.
+
 ## Where do I find the source of truth?
 
 When editing a docs page, verify your claims against the relevant source files
