@@ -52,6 +52,9 @@ for (const file of pages) {
   );
 }
 
+// Collect every broken link across all pages before reporting, instead of
+// stopping at the first failure, so a single run surfaces everything that
+// needs fixing.
 const broken = [];
 
 for (const file of pages) {
@@ -68,9 +71,9 @@ for (const file of pages) {
       const where = `${path.relative(DOCS_ROOT, file)}:${index + 1}`;
 
       if (!anchors.has(targetFile)) {
-        broken.push(`${where} -> ${target} (no page)`);
+        broken.push(`${where}: broken link ${target} (no matching page)`);
       } else if (hash && !anchors.get(targetFile).has(hash)) {
-        broken.push(`${where} -> ${target} (no heading)`);
+        broken.push(`${where}: broken link ${target} (no matching heading)`);
       }
     }
   });
