@@ -15,8 +15,16 @@ export const nav: NavGroup[] = [
   {
     title: "Introduction",
     items: [
-      { title: "Getting Started", href: "/docs/getting-started" },
-      { title: "Project Status", href: "/docs/status" },
+      {
+        title: "Getting Started",
+        href: "/docs/getting-started",
+        description: "What payment streaming is, prerequisites, and creating a first testnet stream.",
+      },
+      {
+        title: "Project Status",
+        href: "/docs/status",
+        description: "Current status of the Stream, Vault, and Registry contracts and API.",
+      },
     ],
   },
   {
@@ -83,6 +91,16 @@ export const nav: NavGroup[] = [
     title: "Guides",
     items: [
       {
+        title: "Use Cases",
+        href: "/docs/guides/use-cases",
+        description: "How stream schedules map to payroll, vesting, subscriptions, and grants, with ledger-based examples.",
+      },
+      {
+        title: "Vesting with a One-Year Cliff",
+        href: "/docs/guides/vesting-with-cliff",
+        description: "A four-year vesting example with the ledger conversion, create_stream arguments, and cliff withdrawal amounts.",
+      },
+      {
         title: "Web App",
         href: "/docs/web-app",
         description: "Connecting Freighter, creating a stream, watching a balance accrue, withdrawing, and cancelling from the Stellar Stream Hive web app.",
@@ -96,6 +114,12 @@ export const nav: NavGroup[] = [
   },
   {
     title: "Resources",
-    items: [{ title: "Links and Resources", href: "/docs/resources" }],
+    items: [
+      {
+        title: "Links and Resources",
+        href: "/docs/resources",
+        description: "Official Stellar references and links to related projects.",
+      },
+    ],
   },
 ];
