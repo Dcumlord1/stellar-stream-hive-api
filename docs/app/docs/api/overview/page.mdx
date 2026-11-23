@@ -176,6 +176,30 @@ function userFacingMessage(body: ApiErrorBody, status: number): string {
   a bug.
 </CalloutBox>
 
+## Event wire format
+
+The indexer decodes three Soroban contract events emitted by the
+[Stream contract](/docs/contracts/stream#events-emitted): `create`, `withdraw`,
+and `cancel` (see `api/src/indexer/events.rs`). Each event's name is its first
+topic `Symbol`, followed by the stream id as a second topic (`U64`). The data
+is a `Vec` of the remaining fields, in declaration order:
+
+| Event | Topics | Data (`Vec`) |
+|---|---|---|
+| `create` | `[Symbol("create"), U64(stream_id)]` | `[Address(sender), Address(recipient), Address(token), I128(total_amount), U32(start_ledger), U32(end_ledger), U32(cliff_ledger), Bool(cancellable)]` |
+| `withdraw` | `[Symbol("withdraw"), U64(stream_id)]` | `[Address(recipient), I128(amount)]` |
+| `cancel` | `[Symbol("cancel"), U64(stream_id)]` | `[Address(sender), I128(streamed_now), I128(remainder)]` |
+
+As returned by Soroban RPC's `getEvents`, each topic and the data value arrive
+as base64-encoded XDR `ScVal` strings -- the indexer decodes them with
+`ScVal::from_xdr_base64` before matching this shape. These three are the only
+events the indexer tracks; the Stream contract's `pause`, `unpause`, and
+`admin_transfer` events (and any Vault/Registry events) carry no stream id and
+are ignored by the indexer. See
+[Events emitted](/docs/contracts/stream#events-emitted) on the Stream contract
+page for the consolidated, contract-verified table across all three
+contracts.
+
 ## Indexer poll cycle
 
 The indexer runs a poll loop on a fixed interval (`POLL_INTERVAL_SECS`,
