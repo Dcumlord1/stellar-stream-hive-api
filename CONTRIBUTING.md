@@ -185,6 +185,36 @@ Not every component in `docs/components/` is meant for page content --
 sidebar, table of contents, theme switch) and are wired up by the layout,
 not used inside `page.mdx` files.
 
+## Documentation style guide
+
+- **Tone**: direct and precise, written for someone integrating against or
+  auditing the platform. Prefer short declarative sentences over marketing
+  language. Say what a value *is* before explaining why it matters.
+- **Heading structure**: one `#` (the page title, set via `metadata.title`,
+  not repeated in the body), then `##` for major sections and `###` for
+  subsections. Don't skip levels. Heading text should be stable, since other
+  pages link to `#kebab-case-of-the-heading-text` anchors.
+- **Code blocks**: always tag the language (` ```typescript `, ` ```rust `,
+  ` ```bash `, ` ```json `) so `CodeBlock` can render the label correctly.
+  Keep examples runnable/accurate -- copy-paste from a real request/response
+  where possible rather than inventing shapes.
+- **Terminology consistency**: use the same terms the rest of the docs use
+  for the same concept -- e.g. "stream", "cliff ledger", "accrual", "vault",
+  "registry" -- rather than introducing synonyms. When in doubt, check how
+  [Streaming Math](docs/app/docs/concepts/streaming-math/page.mdx) and
+  [Security Model](docs/app/docs/concepts/security-model/page.mdx) phrase
+  the same idea, since those are the canonical references.
+- **When to use `Details`**: collapse long, rarely-needed material (full
+  JSON payloads, exhaustive edge-case lists) behind `<Details>` so the main
+  explanation stays scannable. Don't hide anything a first-time reader needs
+  to understand the core concept.
+- **When to use `CalloutBox`**: reserve it for information that changes how
+  a reader should act -- a security warning, a gotcha, a non-obvious
+  constraint. Don't use it for routine asides; those belong in normal prose.
+- **Numeric/technical claims**: must match the actual contract/API behavior
+  (see the source-of-truth table below). If you can't verify a claim, flag
+  it in the PR description instead of guessing.
+
 ## Where do I find the source of truth?
 
 When editing a docs page, verify your claims against the relevant source files
