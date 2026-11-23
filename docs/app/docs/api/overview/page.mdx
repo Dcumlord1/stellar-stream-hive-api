@@ -200,6 +200,34 @@ are ignored by the indexer. See
 page for the consolidated, contract-verified table across all three
 contracts.
 
+## What the indexer ignores
+
+Not every event the indexer reads from `getEvents` ends up applied to the
+in-memory index (see `api/src/indexer/mod.rs`, `ingest`):
+
+- **Events from rolled-back sub-calls.** Soroban RPC flags each event with
+  `inSuccessfulContractCall`. If the sub-call that emitted an event was later
+  rolled back (e.g. a failed `require_auth` further up the call tree), this
+  flag is `false` and the indexer skips the event entirely -- it never reaches
+  the decoder. Rolled-back activity never happened on-chain, so the indexer
+  must not materialize it.
+- **Malformed or unrecognized events.** If an event's topics or data don't
+  match one of the three shapes in
+  [Event wire format](#event-wire-format) -- wrong number of fields, an
+  unexpected `ScVal` type, or undecodable XDR -- `decode_rpc_event` (in
+  `api/src/indexer/events.rs`) returns an error. The indexer logs a warning
+  (with the transaction hash and ledger) and moves on to the next event in
+  the batch; it never stops the indexer loop or drops the rest of the batch.
+  A single bad or unrelated event can therefore never take the service down
+  or stall indexing for other streams.
+
+Both behaviors mean the indexer's in-memory state always reflects only events
+that actually took effect on-chain. If `/streams/:id` is missing a stream you
+expect, check whether its `create` event falls inside the indexer's backfill
+window (see
+[Why `/streams/:id` can 404 even for a real stream id](#why-streamsid-can-404-even-for-a-real-stream-id))
+before assuming it was dropped as malformed.
+
 ## Indexer poll cycle
 
 The indexer runs a poll loop on a fixed interval (`POLL_INTERVAL_SECS`,
