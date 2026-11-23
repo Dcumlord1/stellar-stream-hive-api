@@ -10,7 +10,8 @@
     "lint": "next lint",
     "check-links": "node scripts/check-links.mjs",
     "check-nav": "node scripts/check-nav.mjs",
-    "check-metadata": "node scripts/check-metadata.mjs"
+    "check-metadata": "node scripts/check-metadata.mjs",
+    "test:unit": "node --test scripts/__tests__"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.0.1",

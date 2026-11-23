@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { slugify } from "./slugify.mjs";
 
 const DOCS_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PAGES_DIR = path.join(DOCS_ROOT, "app", "docs");
@@ -31,15 +32,6 @@ function proseLines(text) {
     }
     return inFence ? null : line;
   });
-}
-
-// Approximates rehype-slug (github-slugger): lowercase, drop punctuation, spaces become hyphens.
-function slugify(heading) {
-  return heading
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
-    .trim()
-    .replace(/\s/g, "-");
 }
 
 function routeToFile(urlPath) {
