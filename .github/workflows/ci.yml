@@ -49,6 +49,13 @@ jobs:
           cache: npm
           cache-dependency-path: docs/package-lock.json
       - run: npm ci
+      - name: Cache Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: docs/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('docs/package-lock.json') }}-${{ hashFiles('docs/**/*.[jt]s', 'docs/**/*.[jt]sx', 'docs/**/*.mdx') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('docs/package-lock.json') }}-
       - run: npm run build
       - run: npm run check-links
       - run: npm run check-nav
