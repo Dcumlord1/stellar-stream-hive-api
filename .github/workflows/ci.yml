@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   api:
     name: API (fmt, clippy, test)
@@ -38,15 +45,41 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: docs/.nvmrc
           cache: npm
           cache-dependency-path: docs/package-lock.json
       - run: npm ci
+      - run: npm run typecheck
       - run: npm run build
+      - name: Build output size report
+        run: |
+          echo "## Docs build output size" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -d .next ]; then
+            TOTAL=$(du -sh .next | cut -f1)
+            echo "Total \`.next\` size: **${TOTAL}**" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Directory | Size |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+            du -sh .next/* 2>/dev/null | sort -rh | head -10 | while read -r size path; do
+              echo "| \`${path}\` | ${size} |" >> "$GITHUB_STEP_SUMMARY"
+            done
+          else
+            echo "No \`.next\` directory found; skipping size report." >> "$GITHUB_STEP_SUMMARY"
+          fi
+        continue-on-error: true
       - run: npm run check-links
       - run: npm run check-nav
       - run: npm run check-metadata
       - run: npm run lint
+      - name: Dependency audit (fails on high/critical runtime advisories)
+        # --omit=dev so a dev-only advisory (lint tooling, playwright, etc.)
+        # doesn't block CI; those should be triaged separately, not block
+        # the build. If this fails on a false positive or a patch isn't
+        # available yet, either bump the dependency, or temporarily pin an
+        # exception with `npm audit --omit=dev --audit-level=high` run
+        # locally to confirm, documenting why in the PR before merging.
+        run: npm audit --omit=dev --audit-level=high
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
@@ -57,3 +90,12 @@ jobs:
         run: npm run test:e2e
         env:
           PLAYWRIGHT_SKIP_BUILD: "1"
+      - name: Accessibility check (pa11y)
+        run: |
+          npx next start -p 3200 &
+          npx wait-on http://localhost:3200/docs/getting-started
+          npm run a11y
+      - name: Lighthouse CI budgets
+        run: npm run lighthouse
+        env:
+          LHCI_BUILD_CONTEXT__CURRENT_HASH: ${{ github.sha }}

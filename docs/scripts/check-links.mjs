@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { slugify } from "./slugify.mjs";
 
 const DOCS_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PAGES_DIR = path.join(DOCS_ROOT, "app", "docs");
@@ -33,15 +34,6 @@ function proseLines(text) {
   });
 }
 
-// Approximates rehype-slug (github-slugger): lowercase, drop punctuation, spaces become hyphens.
-function slugify(heading) {
-  return heading
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
-    .trim()
-    .replace(/\s/g, "-");
-}
-
 function routeToFile(urlPath) {
   const segments = urlPath.replace(/^\/docs\/?/, "").split("/").filter(Boolean);
   return path.join(PAGES_DIR, ...segments, "page.mdx");
@@ -60,6 +52,9 @@ for (const file of pages) {
   );
 }
 
+// Collect every broken link across all pages before reporting, instead of
+// stopping at the first failure, so a single run surfaces everything that
+// needs fixing.
 const broken = [];
 
 for (const file of pages) {
@@ -76,9 +71,9 @@ for (const file of pages) {
       const where = `${path.relative(DOCS_ROOT, file)}:${index + 1}`;
 
       if (!anchors.has(targetFile)) {
-        broken.push(`${where} -> ${target} (no page)`);
+        broken.push(`${where}: broken link ${target} (no matching page)`);
       } else if (hash && !anchors.get(targetFile).has(hash)) {
-        broken.push(`${where} -> ${target} (no heading)`);
+        broken.push(`${where}: broken link ${target} (no matching heading)`);
       }
     }
   });

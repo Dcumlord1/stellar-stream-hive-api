@@ -13,18 +13,25 @@ import type { ReactNode } from "react";
 export default function Figure({
   title,
   description,
+  src,
+  alt,
+  caption,
   children,
 }: {
-  title: string;
+  title?: string;
   description?: string;
+  src?: string;
+  alt?: string;
+  caption?: string;
   children?: ReactNode;
 }) {
-  const captionId = `fig-${title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}`;
+  const label = title ?? caption ?? alt ?? "Figure";
+  const captionId = `fig-${label.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}`;
   return (
     <figure className="my-8" aria-labelledby={captionId}>
-      {children}
+      {src ? <img src={src} alt={alt ?? label} /> : children}
       <figcaption id={captionId} className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-        <span className="font-semibold">{title}</span>
+        <span className="font-semibold">{title ?? caption ?? label}</span>
         {description && <span> — {description}</span>}
       </figcaption>
     </figure>

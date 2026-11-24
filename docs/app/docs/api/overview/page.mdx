@@ -176,6 +176,58 @@ function userFacingMessage(body: ApiErrorBody, status: number): string {
   a bug.
 </CalloutBox>
 
+## Event wire format
+
+The indexer decodes three Soroban contract events emitted by the
+[Stream contract](/docs/contracts/stream#events-emitted): `create`, `withdraw`,
+and `cancel` (see `api/src/indexer/events.rs`). Each event's name is its first
+topic `Symbol`, followed by the stream id as a second topic (`U64`). The data
+is a `Vec` of the remaining fields, in declaration order:
+
+| Event | Topics | Data (`Vec`) |
+|---|---|---|
+| `create` | `[Symbol("create"), U64(stream_id)]` | `[Address(sender), Address(recipient), Address(token), I128(total_amount), U32(start_ledger), U32(end_ledger), U32(cliff_ledger), Bool(cancellable)]` |
+| `withdraw` | `[Symbol("withdraw"), U64(stream_id)]` | `[Address(recipient), I128(amount)]` |
+| `cancel` | `[Symbol("cancel"), U64(stream_id)]` | `[Address(sender), I128(streamed_now), I128(remainder)]` |
+
+As returned by Soroban RPC's `getEvents`, each topic and the data value arrive
+as base64-encoded XDR `ScVal` strings -- the indexer decodes them with
+`ScVal::from_xdr_base64` before matching this shape. These three are the only
+events the indexer tracks; the Stream contract's `pause`, `unpause`, and
+`admin_transfer` events (and any Vault/Registry events) carry no stream id and
+are ignored by the indexer. See
+[Events emitted](/docs/contracts/stream#events-emitted) on the Stream contract
+page for the consolidated, contract-verified table across all three
+contracts.
+
+## What the indexer ignores
+
+Not every event the indexer reads from `getEvents` ends up applied to the
+in-memory index (see `api/src/indexer/mod.rs`, `ingest`):
+
+- **Events from rolled-back sub-calls.** Soroban RPC flags each event with
+  `inSuccessfulContractCall`. If the sub-call that emitted an event was later
+  rolled back (e.g. a failed `require_auth` further up the call tree), this
+  flag is `false` and the indexer skips the event entirely -- it never reaches
+  the decoder. Rolled-back activity never happened on-chain, so the indexer
+  must not materialize it.
+- **Malformed or unrecognized events.** If an event's topics or data don't
+  match one of the three shapes in
+  [Event wire format](#event-wire-format) -- wrong number of fields, an
+  unexpected `ScVal` type, or undecodable XDR -- `decode_rpc_event` (in
+  `api/src/indexer/events.rs`) returns an error. The indexer logs a warning
+  (with the transaction hash and ledger) and moves on to the next event in
+  the batch; it never stops the indexer loop or drops the rest of the batch.
+  A single bad or unrelated event can therefore never take the service down
+  or stall indexing for other streams.
+
+Both behaviors mean the indexer's in-memory state always reflects only events
+that actually took effect on-chain. If `/streams/:id` is missing a stream you
+expect, check whether its `create` event falls inside the indexer's backfill
+window (see
+[Why `/streams/:id` can 404 even for a real stream id](#why-streamsid-can-404-even-for-a-real-stream-id))
+before assuming it was dropped as malformed.
+
 ## Indexer poll cycle
 
 The indexer runs a poll loop on a fixed interval (`POLL_INTERVAL_SECS`,

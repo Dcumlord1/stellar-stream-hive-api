@@ -1,5 +1,8 @@
 # Stellar Stream Hive API + Docs
 
+[![CI](https://github.com/Stellar-Hive/stellar-stream-hive-api/actions/workflows/ci.yml/badge.svg)](https://github.com/Stellar-Hive/stellar-stream-hive-api/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+
 A Rust/Axum REST API that indexes payment-stream activity on Stellar, plus the
 documentation site for the whole Stellar Stream Hive platform (contracts + API
 + web app).
@@ -29,6 +32,9 @@ Stellar Stream Hive is split across three repositories:
 api/    Rust + Axum REST API + Horizon-polling indexer  (maintainer-only, see CONTRIBUTING.md)
 docs/   Next.js 14 + TypeScript + Tailwind + MDX documentation site (open to contributions)
 ```
+
+See [`docs/README.md`](docs/README.md) for how to run, build, and contribute
+to the documentation site specifically.
 
 ### `api/`
 
@@ -60,6 +66,8 @@ npm run dev
 ## Contributing
 
 **Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.**
+Participation in this project is governed by our
+[Code of Conduct](CODE_OF_CONDUCT.md).
 In short: `docs/` is open to contributions, `api/` is maintainer-only, and PRs
 touching `api/` will be closed without review.
 

@@ -25,12 +25,6 @@ export const nav: NavGroup[] = [
         href: "/docs/status",
         description: "Current status of the Stream, Vault, and Registry contracts and API.",
       },
-      {
-        title: "FAQ",
-        href: "/docs/faq",
-        description:
-          "Short answers to common questions about stream status, API amounts, cancellation, cliffs, backfill, and indexer readiness, with links to the full docs.",
-      },
     ],
   },
   {
@@ -71,6 +65,11 @@ export const nav: NavGroup[] = [
         href: "/docs/contracts/registry",
         description: "Full function reference for the Registry contract: on-chain indexing and aggregate stats.",
       },
+      {
+        title: "Interface at a Glance",
+        href: "/docs/contracts/interface",
+        description: "One-row-per-function reference for all three contracts: who may call each function, which errors it can return, and which events it emits.",
+      },
     ],
   },
   {
@@ -91,11 +90,26 @@ export const nav: NavGroup[] = [
         href: "/docs/api/stats",
         description: "GET /stats -- aggregate totals across every indexed stream.",
       },
+      {
+        title: "Indexer Architecture",
+        href: "/docs/api/indexer-architecture",
+        description: "How the indexer polls Soroban RPC, decodes events, and keeps its in-memory state up to date: backfill vs. cursor resume, the per-tick call cap, and decoding.",
+      },
     ],
   },
   {
     title: "Guides",
     items: [
+      {
+        title: "Use Cases",
+        href: "/docs/guides/use-cases",
+        description: "How stream schedules map to payroll, vesting, subscriptions, and grants, with ledger-based examples.",
+      },
+      {
+        title: "Vesting with a One-Year Cliff",
+        href: "/docs/guides/vesting-with-cliff",
+        description: "A four-year vesting example with the ledger conversion, create_stream arguments, and cliff withdrawal amounts.",
+      },
       {
         title: "Web App",
         href: "/docs/web-app",

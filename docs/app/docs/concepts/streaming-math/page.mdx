@@ -293,6 +293,38 @@ cliff. A one-year stream with a 90-day cliff makes 90 days of value available
 all at once the moment the cliff passes, exactly matching what a
 continuously-vesting schedule would have accrued by that point.
 
+### Worked example: four-year vesting with a one-year cliff
+
+This illustrative schedule uses a 365-day year, 12,000 XLM, and no prior
+withdrawals. It starts at ledger `1,000,000`. At roughly 5 seconds per ledger:
+
+```text
+one year     = 365 * 86,400 / 5 = 6,307,200 ledgers
+four years   = 4 * 6,307,200   = 25,228,800 ledgers
+start_ledger = 1,000,000
+cliff_ledger = 1,000,000 + 6,307,200  = 7,307,200
+end_ledger   = 1,000,000 + 25,228,800 = 26,228,800
+total_amount = 12,000 * 10,000,000 = 120,000,000,000 stroops
+```
+
+These are planning estimates, not calendar guarantees: actual ledger close
+times vary, and a calendar year can include a leap day. The contract stores the
+ledger values, not the dates.
+
+| Point | `current_ledger` | Formula result (`streamed_amount`) | `withdrawable_amount` |
+|---|---:|---:|---:|
+| One ledger before cliff | 7,307,199 | 29,999,995,243 stroops | 0 |
+| At cliff | 7,307,200 | 30,000,000,000 stroops (3,000 XLM) | 30,000,000,000 stroops (3,000 XLM) |
+| One ledger after cliff | 7,307,201 | 30,000,004,756 stroops | 30,000,004,756 stroops |
+
+For example, at the cliff the calculation is
+`120,000,000,000 * 6,307,200 / 25,228,800 = 30,000,000,000` stroops.
+Before the cliff, that accrued amount is not withdrawable; at the cliff it
+becomes available together. The one-ledger-after value is floored by integer
+division, as in the contract's multiply-before-divide formula. The complete
+`create_stream` argument set and an explanation of the example are in the
+[vesting guide](/docs/guides/vesting-with-cliff).
+
 The chart below plots the one-year, 90-day-cliff example from this section. The
 dashed line is what has accrued. The solid line is what the recipient can
 withdraw. The solid line stays at zero until the cliff, then jumps up to the
@@ -412,6 +444,67 @@ had already withdrawn part of `streamed_at_cancel`, only the remainder
 time; the rest was already in their hands. See
 [Security Model](/docs/concepts/security-model) for who is allowed to call
 `cancel_stream` and how the vault enforces this split.
+
+### Worked example: mid-stream cancel after a partial withdrawal
+
+Take the same 3,000 XLM, 30-day stream from earlier
+(`total_amount = 30_000_000_000` stroops, `start_ledger = 1_000_000`,
+`end_ledger = 1_518_400`, no cliff).
+
+**Step 1 &mdash; recipient withdraws at day 7.5.**
+At `current_ledger = 1_129_600` (elapsed = 129,600 ledgers, one-quarter through):
+
+```text
+streamed_amount  = 30_000_000_000 * 129_600 / 518_400 = 7_500_000_000  (750 XLM)
+withdrawable     = 7_500_000_000 - 0 = 7_500_000_000
+```
+
+The recipient withdraws 500 XLM (5,000,000,000 stroops). After the call:
+
+```text
+withdrawn = 5_000_000_000
+```
+
+**Step 2 &mdash; sender cancels at day 20.**
+At `current_ledger = 1_345_600` (elapsed = 345,600 ledgers):
+
+```text
+streamed_at_cancel = 30_000_000_000 * 345_600 / 518_400 = 20_000_000_000  (2,000 XLM)
+sender_refund      = 30_000_000_000 - 20_000_000_000    = 10_000_000_000  (1,000 XLM)
+```
+
+`cancel_stream` immediately sends the 1,000 XLM refund back to the sender via
+`vault.refund`. It does **not** pay the recipient anything here; it records
+`cancelled_at_ledger` and freezes `streamed_amount` at `20_000_000_000` for
+all future reads.
+
+**Step 3 &mdash; recipient withdraws after the cancel.**
+The recipient calls `withdraw_max` at any ledger after the cancel. Because
+`streamed_amount` is now frozen at `20_000_000_000` and `withdrawn` is
+already `5_000_000_000`:
+
+```text
+withdrawable = 20_000_000_000 - 5_000_000_000 = 15_000_000_000  (1,500 XLM)
+```
+
+`withdraw_max` transfers 1,500 XLM to the recipient.
+
+**Final accounting:**
+
+| Party | Received | How |
+|---|---|---|
+| Recipient | 500 XLM | Withdrawn before cancel (step 1) |
+| Recipient | 1,500 XLM | Withdrawn after cancel (step 3) |
+| Sender | 1,000 XLM | Refunded at cancel (step 2) |
+| **Total** | **3,000 XLM** | **= `total_amount`; nothing created or destroyed** |
+
+<CalloutBox variant="info" title="The cancel event carries the split">
+  The `cancel` event emitted by `cancel_stream` has two data fields:
+  `streamed_now` (`20_000_000_000` here) and `remainder` (`10_000_000_000`
+  here). `streamed_now` is what the recipient is entitled to in total
+  (before subtracting already-`withdrawn`); `remainder` is what goes back
+  to the sender. These match the numbers in step 2 exactly.
+</CalloutBox>
 
 ## Edge cases
 
