@@ -1,0 +1,28 @@
+name: Docs external link check
+
+on:
+  schedule:
+    # Every Monday at 09:00 UTC.
+    - cron: "0 9 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  check-external-links:
+    name: Check external links (docs)
+    runs-on: ubuntu-latest
+    # Informational only: this must never become a required check. It
+    # checks third-party sites on a schedule, separate from the PR-time
+    # internal check-links run in ci.yml, and should never block a PR.
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      - run: npm ci
+      - name: Check external links
+        run: npm run check-external-links | tee -a "$GITHUB_STEP_SUMMARY"
