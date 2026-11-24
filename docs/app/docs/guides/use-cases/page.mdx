@@ -1,0 +1,100 @@
+export const metadata = {
+  title: "Use Cases",
+  description:
+    "How to choose stream start, end, cliff, and cancellation settings for payroll, vesting, subscriptions, and grants.",
+};
+
+# Use Cases
+
+Payroll, vesting, subscriptions, and grants all use the same stream primitive:
+the sender locks a fixed amount, it accrues linearly between `start_ledger`
+and `end_ledger`, and the recipient can withdraw the available amount. A
+cliff sets a minimum ledger before anything can be withdrawn. These parameters
+do not create recurring payments, milestones, or special-purpose rules.
+
+All examples use XLM (7 decimals), `S = 1,000,000` as an illustrative start
+ledger, and the estimate of 5 seconds per ledger. Replace `S` with a valid
+schedule for the network in use. Ledger close times vary, so these conversions
+are planning estimates. See [Streaming Math](/docs/concepts/streaming-math)
+for the formula and token-unit details.
+
+## Payroll
+
+- **Start:** The beginning of the pay period.
+- **End:** The end of that period. For a 30-day example, use
+  `S + 30 * 17,280 = S + 518,400`.
+- **Cliff:** Usually `S` (no delay), so accrued pay is withdrawable as it
+  streams. A later cliff instead holds withdrawals until that ledger.
+- **Cancellable:** Set `true` if the sender should be able to stop an
+  unfinished stream; set `false` if the schedule should not allow sender
+  cancellation.
+
+For 3,000 XLM over 30 days, the total is `30,000,000,000` stroops. At
+`S + 259,200` (15 days), half has accrued:
+`30,000,000,000 * 259,200 / 518,400 = 15,000,000,000` stroops (1,500 XLM).
+The recipient can withdraw that accrued amount. If cancellable, the sender
+can cancel before completion and receives the unstreamed remainder; the
+recipient keeps the amount streamed at cancellation. This is a finite
+30-day stream, not automatic payroll processing or a recurring salary.
+
+## Vesting
+
+- **Start:** The grant's vesting start.
+- **End:** The end of the vesting term. A four-year example uses
+  `S + 4 * 365 * 17,280 = S + 25,228,800`.
+- **Cliff:** For a one-year cliff, use `S + 365 * 17,280 = S + 6,307,200`.
+  The cliff delays withdrawals; it does not restart accrual.
+- **Cancellable:** Choose according to the grant terms. If `true`, the sender
+  can cancel an eligible unfinished stream; vested value remains for the
+  recipient and the unvested remainder is refunded. If `false`, the sender
+  cannot cancel it.
+
+For the detailed `create_stream` example and amounts immediately before, at,
+and after the cliff, see
+[Vesting with a One-Year Cliff](/docs/guides/vesting-with-cliff).
+
+## Subscriptions
+
+- **Start:** The start of the prepaid service period.
+- **End:** The end of the finite subscription term. A 30-day term is
+  `S + 518,400`.
+- **Cliff:** Usually `S`, so the service provider can withdraw as the payment
+  accrues rather than waiting for a later threshold.
+- **Cancellable:** Set `true` if the payer should be able to stop the
+  unfinished stream; otherwise set `false`.
+
+For 300 XLM over 30 days with no cliff, at `S + 259,200` the recipient can
+withdraw 150 XLM (`3,000,000,000 * 259,200 / 518,400 =
+1,500,000,000` stroops), assuming nothing was already withdrawn. The recipient
+can withdraw what is available; if cancellable, the sender can cancel the
+remaining schedule and recover its unstreamed share. A stream does not renew
+or charge a new term automatically.
+
+## Grants
+
+- **Start:** When the grant period begins.
+- **End:** The end of the time-based grant. For a 90-day grant, use
+  `S + 90 * 17,280 = S + 1,555,200`.
+- **Cliff:** Use `S` for immediate access to accrued funds, or a later ledger
+  for a time-based waiting period. A cliff is not a milestone.
+- **Cancellable:** Set `true` if the sender should be able to stop future
+  accrual before completion, or `false` if cancellation should not be allowed.
+
+For 900 XLM over 90 days with a 30-day cliff, the cliff is
+`S + 518,400`. At `S + 777,600` (day 45), 450 XLM has accrued and, because
+the cliff has passed, is withdrawable if nothing was previously withdrawn.
+The recipient can withdraw accrued funds; if cancellable, the sender can stop
+the unfinished grant and recover the unstreamed remainder. The contract does
+not check deliverables, approve milestones, or reclaim amounts already
+withdrawn.
+
+## Who can act
+
+The recipient alone can withdraw from a stream. The sender funds it at
+creation and can call `cancel_stream` only when `cancellable` is `true` and
+the stream has not completed or already been cancelled. Cancellation stops
+future accrual, leaves the amount streamed through that ledger for the
+recipient, and returns the unstreamed remainder to the sender. Before a
+cliff, the recipient has earned nothing under the contract's cancellation
+rules. These are contract limits, not guarantees about an employment,
+subscription, vesting, or grant agreement.
