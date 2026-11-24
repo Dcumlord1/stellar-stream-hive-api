@@ -1,0 +1,138 @@
+import Figure from "@/components/Figure";
+
+export const metadata = {
+  title: "Indexer Architecture",
+  description:
+    "How the Stellar Stream Hive indexer polls Soroban RPC, decodes events, and keeps its in-memory state up to date.",
+};
+
+# API Reference: Indexer Architecture
+
+This page describes how the background indexer task in
+`stellar-stream-hive-api` works, for integrators who want to run their own
+instance or reason about its data-freshness guarantees. Every claim below is
+sourced from `api/src/indexer/*.rs` and `api/README.md` -- see
+[`stellar-stream-hive-api`](https://github.com/Stellar-Hive/stellar-stream-hive-api)
+(`api/` directory).
+
+## Overview
+
+The indexer is a single background task, spawned once from `main` and running
+for the life of the process (`api/src/indexer/mod.rs::run`). It never panics
+and never exits on a transient error: a failed RPC request is logged and
+retried on the next tick. Each tick:
+
+1. Reads the latest ledger from Soroban RPC.
+2. Calls `getEvents`, filtered server-side to the configured
+   `STREAM_CONTRACT_ID`.
+3. Decodes each returned event (see
+   [Event wire format](/docs/api/overview#event-wire-format)).
+4. Applies decoded events to the in-memory `AppState`.
+5. Repeats steps 2-4, within a per-tick call cap, until it catches up to the
+   chain tip.
+
+<Figure
+  title="Indexer architecture"
+  description="Soroban RPC feeds the poll loop, which hands raw events to the decoder; decoded stream-lifecycle events are applied to in-memory state, which the HTTP routes read on every request."
+>
+  <svg
+    viewBox="0 0 720 200"
+    role="img"
+    aria-label="Flow diagram: Soroban RPC to poll loop to decoder to in-memory state to HTTP routes"
+    xmlns="http://www.w3.org/2000/svg"
+    style={{ maxWidth: "100%", height: "auto" }}
+  >
+    <defs>
+      <marker id="arch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+      </marker>
+    </defs>
+    <g fill="none" stroke="currentColor">
+      <rect x="10" y="70" width="130" height="50" rx="6" />
+      <rect x="190" y="70" width="130" height="50" rx="6" />
+      <rect x="370" y="70" width="130" height="50" rx="6" />
+      <rect x="550" y="70" width="160" height="50" rx="6" />
+    </g>
+    <g fill="currentColor" fontSize="13" textAnchor="middle" fontWeight="600">
+      <text x="75" y="99">Soroban RPC</text>
+      <text x="255" y="92">Poll loop</text>
+      <text x="255" y="108">(getEvents)</text>
+      <text x="435" y="92">Decoder</text>
+      <text x="435" y="108">(events.rs)</text>
+      <text x="630" y="92">In-memory</text>
+      <text x="630" y="108">state</text>
+    </g>
+    <g stroke="currentColor" fill="currentColor">
+      <line x1="140" y1="95" x2="182" y2="95" markerEnd="url(#arch-arrow)" />
+      <line x1="320" y1="95" x2="362" y2="95" markerEnd="url(#arch-arrow)" />
+      <line x1="500" y1="95" x2="542" y2="95" markerEnd="url(#arch-arrow)" />
+    </g>
+    <g fill="none" stroke="currentColor" strokeDasharray="4 4">
+      <rect x="550" y="150" width="160" height="40" rx="6" />
+    </g>
+    <g fill="currentColor" fontSize="12" textAnchor="middle" fontWeight="600">
+      <text x="630" y="174">HTTP routes</text>
+    </g>
+    <line x1="630" y1="120" x2="630" y2="148" stroke="currentColor" markerEnd="url(#arch-arrow)" />
+  </svg>
+</Figure>
+
+## Backfill versus cursor resume
+
+The indexer's position in the event stream is tracked as either:
+
+- **`FromLedger(ledger)`** -- used only for the very first call after the
+  process starts. It starts `INDEXER_BACKFILL_LEDGERS` ledgers back from the
+  chain tip (default `17280`, about a day), so a restart recovers recent
+  activity rather than starting empty.
+- **`After(cursor)`** -- used for every call after the first. The cursor is
+  the position `getEvents` returned with the last page (even an empty one),
+  so resuming never re-reads an already-seen window and never skips anything
+  landing between two polls.
+
+If a backfill start ledger falls outside Soroban RPC's retention window, the
+RPC request fails; the indexer treats that specific failure as a signal to
+jump straight to the chain tip rather than retrying a request that can never
+succeed (`api/src/indexer/mod.rs::run`).
+
+## Per-tick call cap
+
+`getEvents` scans a bounded window of ledgers per call and always returns a
+cursor for how far it got, even when it found nothing -- an empty page is not
+proof of being caught up. Each tick therefore keeps calling `getEvents` and
+re-adopting the returned cursor until either:
+
+- the cursor reaches the chain tip (`latest_ledger`), or
+- the cursor stops advancing (no progress), or
+- `MAX_CALLS_PER_TICK` (`50`) calls have been made this tick.
+
+The cap exists so that catching up from a long way behind can never
+monopolize the task; whatever is left resumes on the next tick
+(`POLL_INTERVAL_SECS`, default 10 seconds) rather than blocking it
+indefinitely.
+
+## Decoding and in-memory state
+
+Each page of raw events is handed to `ingest` (`api/src/indexer/mod.rs`),
+which:
+
+1. Skips any event where Soroban RPC's `inSuccessfulContractCall` flag is
+   `false` -- it came from a sub-call that was later rolled back.
+2. Passes the rest to `decode_rpc_event` (`api/src/indexer/events.rs`), which
+   recognizes the `create`, `withdraw`, and `cancel` events and returns
+   `Ok(None)` for anything else (e.g. `pause`/`unpause`/`admin_transfer`).
+3. Logs a warning and skips any event whose topics or data don't match the
+   expected shape, without stopping the rest of the batch.
+
+Decoded events are applied directly to `AppState`, an in-memory store (no
+database) that the HTTP routes under
+[API Reference](/docs/api/overview#endpoints) read on every request. See
+[What the indexer ignores](/docs/api/overview#what-the-indexer-ignores) for
+the full detail on rolled-back and malformed events.
+
+## Further reading
+
+- [API Overview: Event wire format](/docs/api/overview#event-wire-format)
+- [API Overview: What the indexer ignores](/docs/api/overview#what-the-indexer-ignores)
+- [API Overview: Indexer poll cycle](/docs/api/overview#indexer-poll-cycle)
+- [`api/README.md`](https://github.com/Stellar-Hive/stellar-stream-hive-api/blob/main/api/README.md)

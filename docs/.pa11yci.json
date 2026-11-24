@@ -1,0 +1,26 @@
+{
+  "defaults": {
+    "standard": "WCAG2AA",
+    "timeout": 30000,
+    "wait": 500,
+    "chromeLaunchConfig": {
+      "args": ["--no-sandbox", "--disable-setuid-sandbox"]
+    }
+  },
+  "urls": [
+    "http://localhost:3200/docs/getting-started",
+    "http://localhost:3200/docs/api/overview",
+    "http://localhost:3200/docs/api/streams",
+    "http://localhost:3200/docs/api/stats",
+    "http://localhost:3200/docs/contracts/stream",
+    "http://localhost:3200/docs/contracts/vault",
+    "http://localhost:3200/docs/contracts/registry",
+    "http://localhost:3200/docs/concepts/glossary",
+    "http://localhost:3200/docs/concepts/security-model",
+    "http://localhost:3200/docs/concepts/streaming-math",
+    "http://localhost:3200/docs/integration",
+    "http://localhost:3200/docs/web-app",
+    "http://localhost:3200/docs/resources",
+    "http://localhost:3200/docs/status"
+  ]
+}
