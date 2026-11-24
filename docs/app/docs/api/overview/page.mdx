@@ -424,3 +424,39 @@ The server listens for `Ctrl-C` (SIGINT) and, on Unix, SIGTERM. When either
 signal arrives it stops accepting new connections and shuts the HTTP server
 down gracefully rather than terminating abruptly. This is what lets a process
 manager or container runtime stop the service with a normal signal.
+
+## Running the API in production
+
+The API is a single process that reads everything from Soroban RPC and keeps
+its index in memory. This checklist covers only behaviour implemented in
+`api/`; it does not assume any particular hosting platform or instance size.
+
+- [ ] **Point `SOROBAN_RPC_URL` at the RPC you intend to use.** It defaults to
+      the public testnet endpoint. Every stream the API knows about comes from
+      that RPC's `getEvents` responses.
+- [ ] **Set `STREAM_CONTRACT_ID` to your real Stream contract `C...` address.**
+      The default is a placeholder that is not a real contract address. With
+      the placeholder, the process still starts and tracks ledgers, but
+      `contract_configured` is `false` in [`/ready`](#get-ready) and `/streams`
+      stays empty because there is no contract id to match events against.
+- [ ] **Keep `INDEXER_BACKFILL_LEDGERS` inside the RPC's event retention.** On
+      boot, the first poll starts that many ledgers behind the tip (the default
+      is listed in [Environment variables](#environment-variables)). If that
+      start ledger is older than the RPC's retention, the RPC rejects the
+      range and the indexer falls back to starting at the tip, so those older
+      events are not recovered. Use a window the RPC can actually serve and
+      that covers the history you need.
+- [ ] **Restrict `CORS_ALLOWED_ORIGINS` if browsers will call the API.** It is
+      unset by default, which means any origin is allowed; a lone `*` means the
+      same thing. Set it to a comma-separated list of your frontend's origins
+      to narrow it -- see [CORS](#cors).
+- [ ] **Check [`/ready`](#health-and-readiness) before treating the API as
+      usable.** `/health` only says the HTTP server is up. `/ready` also always
+      returns `200`, so read the body: wait for `synced` and
+      `contract_configured` to be `true`, and check that `latest_ledger` and
+      `indexed_streams` are consistent with what you expect.
+- [ ] **Expect the index to be rebuilt after a restart.** There is no database:
+      all state lives in memory. A restart starts with an empty index and
+      re-reads recent events within the backfill window above, so streams whose
+      `create` event falls outside that window will not reappear. See
+      [Why `/streams/:id` can 404 even for a real stream id](#why-streamsid-can-404-even-for-a-real-stream-id).

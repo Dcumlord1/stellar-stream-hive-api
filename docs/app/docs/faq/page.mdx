@@ -1,0 +1,93 @@
+export const metadata = {
+  title: "FAQ",
+  description:
+    "Short answers to common questions about stream status, API amounts, cancellation, cliffs, backfill, and indexer readiness, with links to the full docs.",
+};
+
+# FAQ
+
+Short answers to questions that come up often. Each answer points to the page
+with the authoritative explanation.
+
+## Why does a stream show `active` before the indexer has caught up to the chain tip?
+
+The API does not receive an event when a stream becomes active. It derives the
+effective status on every read from the latest ledger the indexer has observed,
+so the stream reads `active` as soon as that ledger reaches its `start_ledger`,
+even while the indexer is still processing older events. `/ready` reports the
+observed `latest_ledger`; see [Effective status](/docs/api/streams#effective-status)
+and [Health and readiness](/docs/api/overview#health-and-readiness).
+
+## Why are amounts JSON strings instead of numbers?
+
+Amounts are on-chain `i128` values in the token's smallest unit. JSON numbers
+cannot represent them exactly in JavaScript or TypeScript once they exceed the
+safe-integer range, so the API serializes them as decimal strings. Parse them
+with `BigInt` before doing arithmetic -- see
+[Response conventions](/docs/api/overview#response-conventions) and the
+[client-side example](/docs/integration#computing-streamed_amount-client-side).
+
+## Does cancelling refund the recipient?
+
+Cancellation refunds the **sender** the unvested remainder. The recipient's
+vested share is not paid out at cancellation; it stays in the Vault and is
+claimed through the normal `withdraw` / `withdraw_max` path. If cancellation
+happens before the cliff, the recipient is entitled to nothing and the sender
+is refunded the full amount. See
+[What happens on cancel](/docs/concepts/streaming-math#what-happens-on-cancel)
+and [`cancel_stream`](/docs/contracts/stream#cancel_stream).
+
+## What is a cliff?
+
+A cliff is the ledger before which nothing is withdrawable, even though
+accrual has already started. `cliff_ledger == start_ledger` means the stream has
+no cliff. Once the cliff passes, everything accrued since `start_ledger`
+becomes withdrawable at once. See
+[Cliff behavior](/docs/concepts/streaming-math#cliff-behavior) and the
+[Glossary](/docs/concepts/glossary#cliff).
+
+## Why does `/streams/:id` return 404 for a stream I know exists?
+
+The index only knows streams whose `create` event it has observed within its
+backfill window, and only when a real contract id is configured. Streams
+created before that window, or before `STREAM_CONTRACT_ID` was set, are not in
+the index. See the
+[404 note in the API overview](/docs/api/overview#why-streamsid-can-404-even-for-a-real-stream-id)
+and the [production checklist](/docs/api/overview#running-the-api-in-production).
+
+## Can I create, withdraw from, or cancel a stream through the API?
+
+No. The API exposes only read-only `GET` endpoints and never submits
+transactions. Those operations are contract calls signed by the sender or
+recipient; see the [Integration Guide](/docs/integration) and the
+[Stream Contract reference](/docs/contracts/stream#functions).
+
+## How fresh are `streamed_amount` and `withdrawable_amount`?
+
+Both are computed on each request against the indexer's most recently observed
+ledger, rather than stored in the index. They follow the indexer's next poll,
+so they can lag the chain tip until that poll completes. See
+[Response conventions](/docs/api/overview#response-conventions) and the
+[Indexer poll cycle](/docs/api/overview#indexer-poll-cycle).
+
+## What is the difference between `/health` and `/ready`?
+
+`/health` is a liveness check that always returns plain-text `ok`. `/ready`
+also returns `200`, but its body reports `synced`, `latest_ledger`,
+`contract_configured`, and `indexed_streams` -- read the body, not the status
+code. See [Health and readiness](/docs/api/overview#health-and-readiness).
+
+## Does the indexer need a database, and what happens on restart?
+
+No database is used: indexed state lives in memory. A restart begins with an
+empty index and re-reads recent events within the backfill window, so streams
+whose events fall outside that window are not restored. See the
+[production checklist](/docs/api/overview#running-the-api-in-production) and
+[Indexer API status](/docs/status#indexer-api).
+
+## Who can cancel a stream?
+
+Only the sender, and only if `cancellable` was set at creation and the stream
+has not already completed or been cancelled. Cancellation freezes accrual at
+that ledger; see [`cancel_stream`](/docs/contracts/stream#cancel_stream) and the
+[Security Model](/docs/concepts/security-model#auth-requirements-per-function).
