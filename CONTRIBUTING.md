@@ -103,6 +103,125 @@ npm run lint
   docs or in `api/src/`. If you're not sure something is still accurate,
   flag it in your PR description rather than guessing.
 
+## Available MDX components
+
+These components are available globally to every `page.mdx` under
+`docs/app/docs/` (no import needed) unless noted otherwise. Source lives in
+`docs/components/`.
+
+- **`CalloutBox`** (`CalloutBox.tsx`) -- a styled note/warning/tip box.
+  `variant` is one of `"info" | "warning" | "success" | "danger"`.
+
+  ```mdx
+  <CalloutBox variant="warning">
+    Withdrawals before the cliff ledger always return zero, even if funds
+    have technically streamed.
+  </CalloutBox>
+  ```
+
+- **`ApiEndpoint`** (`ApiEndpoint.tsx`) -- a labeled header for an API
+  reference section. Place it at the top of the section it describes.
+
+  ```mdx
+  <ApiEndpoint
+    method="GET"
+    path="/streams/:id"
+    description="Fetch the current state of a single stream by its on-chain ID."
+  />
+  ```
+
+- **`Figure`** (`Figure.tsx`) -- wraps an inline SVG diagram with a visible
+  caption and an accessible label. Both `title` and `description` are
+  required; `description` becomes the figure's alt text (shown after an
+  em-dash) and `npm run check-figures` fails the build if it's missing or
+  empty.
+
+  ```mdx
+  <Figure title="Linear accrual over time" description="A straight line from zero at the start ledger to the total amount at the end ledger.">
+    <svg viewBox="0 0 200 100">{/* diagram */}</svg>
+  </Figure>
+  ```
+
+- **`Details`** (`Details.tsx`) -- a collapsed-by-default `<details>`/
+  `<summary>` block for optional reference material (full JSON responses,
+  edge cases). Add the `open` attribute to start it expanded.
+
+  ```mdx
+  <Details summary="Full JSON response">
+    ```json
+    { "id": "stream_123", "status": "active" }
+    ```
+  </Details>
+  ```
+
+- **Fenced code blocks** render through `CodeBlock.tsx` automatically -- just
+  use normal Markdown fences with a language tag; you get a language label
+  and a copy button for free.
+
+  ```mdx
+  \`\`\`typescript
+  const client = new StreamHiveClient();
+  \`\`\`
+  ```
+
+- **`StreamingCalculator`** (`StreamingCalculator.tsx`) -- an interactive,
+  client-side calculator for the streamed/withdrawable amount formula. Takes
+  no props; all state is internal. Drop it into a concepts page where the
+  accrual formula is explained.
+
+  ```mdx
+  <StreamingCalculator />
+  ```
+
+- **`DateToLedgerConverter`** (`DateToLedgerConverter.tsx`) -- an interactive
+  converter that estimates a ledger sequence from a target date, assuming a
+  5-second ledger close time. Takes no props.
+
+  ```mdx
+  <DateToLedgerConverter />
+  ```
+
+- **`TechArticleJsonLd`** (`TechArticleJsonLd.tsx`) -- emits `TechArticle`
+  JSON-LD structured data for the current page, derived from its entry in
+  `docs/lib/nav.ts`. It's rendered once per page by the shared layout, not
+  something you add to individual `.mdx` files.
+
+Not every component in `docs/components/` is meant for page content --
+`EditOnGitHub.tsx`, `PageNav.tsx`, `Sidebar.tsx`, `SiteHeader.tsx`,
+`ThemeToggle.tsx`, and `Toc.tsx` are part of the site chrome (header,
+sidebar, table of contents, theme switch) and are wired up by the layout,
+not used inside `page.mdx` files.
+
+## Documentation style guide
+
+- **Tone**: direct and precise, written for someone integrating against or
+  auditing the platform. Prefer short declarative sentences over marketing
+  language. Say what a value *is* before explaining why it matters.
+- **Heading structure**: one `#` (the page title, set via `metadata.title`,
+  not repeated in the body), then `##` for major sections and `###` for
+  subsections. Don't skip levels. Heading text should be stable, since other
+  pages link to `#kebab-case-of-the-heading-text` anchors.
+- **Code blocks**: always tag the language (` ```typescript `, ` ```rust `,
+  ` ```bash `, ` ```json `) so `CodeBlock` can render the label correctly.
+  Keep examples runnable/accurate -- copy-paste from a real request/response
+  where possible rather than inventing shapes.
+- **Terminology consistency**: use the same terms the rest of the docs use
+  for the same concept -- e.g. "stream", "cliff ledger", "accrual", "vault",
+  "registry" -- rather than introducing synonyms. When in doubt, check how
+  [Streaming Math](docs/app/docs/concepts/streaming-math/page.mdx) and
+  [Security Model](docs/app/docs/concepts/security-model/page.mdx) phrase
+  the same idea, since those are the canonical references.
+- **When to use `Details`**: collapse long, rarely-needed material (full
+  JSON payloads, exhaustive edge-case lists) behind `<Details>` so the main
+  explanation stays scannable. Don't hide anything a first-time reader needs
+  to understand the core concept.
+- **When to use `CalloutBox`**: reserve it for information that changes how
+  a reader should act -- a security warning, a gotcha, a non-obvious
+  constraint. Don't use it for routine asides; those belong in normal prose.
+- **Numeric/technical claims**: must match the actual contract/API behavior
+  (see the source-of-truth table below). If you can't verify a claim, flag
+  it in the PR description instead of guessing.
+
 ## Where do I find the source of truth?
 
 When editing a docs page, verify your claims against the relevant source files
