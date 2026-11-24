@@ -17,7 +17,7 @@ export default function Figure({
 }: {
   title: string;
   description?: string;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   const captionId = `fig-${title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}`;
   return (

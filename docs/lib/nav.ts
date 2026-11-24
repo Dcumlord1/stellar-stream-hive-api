@@ -15,8 +15,22 @@ export const nav: NavGroup[] = [
   {
     title: "Introduction",
     items: [
-      { title: "Getting Started", href: "/docs/getting-started" },
-      { title: "Project Status", href: "/docs/status" },
+      {
+        title: "Getting Started",
+        href: "/docs/getting-started",
+        description: "What payment streaming is, prerequisites, and creating a first testnet stream.",
+      },
+      {
+        title: "Project Status",
+        href: "/docs/status",
+        description: "Current status of the Stream, Vault, and Registry contracts and API.",
+      },
+      {
+        title: "FAQ",
+        href: "/docs/faq",
+        description:
+          "Short answers to common questions about stream status, API amounts, cancellation, cliffs, backfill, and indexer readiness, with links to the full docs.",
+      },
     ],
   },
   {
@@ -96,6 +110,12 @@ export const nav: NavGroup[] = [
   },
   {
     title: "Resources",
-    items: [{ title: "Links and Resources", href: "/docs/resources" }],
+    items: [
+      {
+        title: "Links and Resources",
+        href: "/docs/resources",
+        description: "Official Stellar references and links to related projects.",
+      },
+    ],
   },
 ];
