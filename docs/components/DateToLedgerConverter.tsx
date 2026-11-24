@@ -119,11 +119,11 @@ export default function DateToLedgerConverter() {
           </p>
         )}
 
-        {'error' in result && (
+        {result !== null && 'error' in result && (
           <p className="text-sm text-red-600 dark:text-red-400">{result.error}</p>
         )}
 
-        {'estimatedLedger' in result && (
+        {result !== null && 'estimatedLedger' in result && result.estimatedLedger !== undefined && (
           <div className="rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950">
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Estimated ledger at target date
