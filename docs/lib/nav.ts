@@ -65,6 +65,11 @@ export const nav: NavGroup[] = [
         href: "/docs/contracts/registry",
         description: "Full function reference for the Registry contract: on-chain indexing and aggregate stats.",
       },
+      {
+        title: "Interface at a Glance",
+        href: "/docs/contracts/interface",
+        description: "One-row-per-function reference for all three contracts: who may call each function, which errors it can return, and which events it emits.",
+      },
     ],
   },
   {

@@ -1,0 +1,92 @@
+import CalloutBox from "@/components/CalloutBox";
+
+export const metadata = {
+  title: "Interface at a Glance",
+  description:
+    "One-row-per-function reference for all three contracts: who may call each function, which errors it can return, and which events it emits.",
+};
+
+# Interface at a Glance
+
+The table below lists every public function across the Stream, Vault, and
+Registry contracts in one place. Use it to find, at a glance, who must
+authorize a call, what errors to handle, and what events to listen for.
+
+For the full description of each function — parameters, return values, and
+prose on why each auth rule exists — follow the link in the **Function**
+column to the per-contract reference page. For the payload shape of each
+event, see [Stream contract: events emitted](/docs/contracts/stream#events-emitted).
+
+<CalloutBox variant="warning" title="Checked against commit 33a0840">
+  This table was generated from
+  [`stellar-stream-hive-contract`](https://github.com/Stellar-Hive/stellar-stream-hive-contract)
+  at commit `33a0840` (`contracts/*/src/lib.rs` and `contracts/*/src/events.rs`).
+  Re-verify against the contract source if the contracts change.
+</CalloutBox>
+
+<CalloutBox variant="danger" title="Unaudited — testnet only">
+  These contracts have not been externally audited. Treat the auth rules here
+  as design intent, not audited guarantees.
+</CalloutBox>
+
+## Stream contract
+
+| Function | Caller (who must authorize) | Errors it can return | Events emitted |
+|---|---|---|---|
+| [`initialize`](/docs/contracts/stream#initialize) | `admin` | `AlreadyInitialized` | — |
+| [`create_stream`](/docs/contracts/stream#create_stream) | `sender` | `Paused`, `InvalidAmount`, `InvalidTimeRange`, `InvalidCliff`, `NotInitialized` | `create` |
+| [`streamed_amount`](/docs/contracts/stream#streamed_amount) | Anyone (read-only) | `StreamNotFound`, `InvalidTimeRange`, `MathOverflow` | — |
+| [`withdrawable_amount`](/docs/contracts/stream#withdrawable_amount) | Anyone (read-only) | `StreamNotFound`, `InvalidTimeRange`, `MathOverflow` | — |
+| [`withdraw`](/docs/contracts/stream#withdraw) | `recipient` | `InvalidAmount`, `StreamNotFound`, `Unauthorized`, `ExceedsWithdrawable`, `MathOverflow` | `withdraw` |
+| [`withdraw_max`](/docs/contracts/stream#withdraw_max) | `recipient` (delegated to `withdraw`) | `StreamNotFound`, `Unauthorized`, `MathOverflow` | `withdraw` (omitted if amount is 0) |
+| [`cancel_stream`](/docs/contracts/stream#cancel_stream) | `sender` | `StreamNotFound`, `Unauthorized`, `NotCancellable`, `AlreadyFinalized`, `MathOverflow` | `cancel` |
+| [`get_stream`](/docs/contracts/stream#get_stream) | Anyone (read-only) | `StreamNotFound` | — |
+| [`get_streams_by_sender`](/docs/contracts/stream#get_streams_by_sender--get_streams_by_recipient) | Anyone (read-only) | — | — |
+| [`get_streams_by_recipient`](/docs/contracts/stream#get_streams_by_sender--get_streams_by_recipient) | Anyone (read-only) | — | — |
+| [`get_streams_by_sender_page`](/docs/contracts/stream#get_streams_by_sender--get_streams_by_recipient) | Anyone (read-only) | — | — |
+| [`get_streams_by_recipient_page`](/docs/contracts/stream#get_streams_by_sender--get_streams_by_recipient) | Anyone (read-only) | — | — |
+| [`count_streams_by_sender`](/docs/contracts/stream#get_streams_by_sender--get_streams_by_recipient) | Anyone (read-only) | — | — |
+| [`count_streams_by_recipient`](/docs/contracts/stream#get_streams_by_sender--get_streams_by_recipient) | Anyone (read-only) | — | — |
+| [`get_status`](/docs/contracts/stream#get_status) | Anyone (read-only) | `StreamNotFound` | — |
+| [`get_admin`](/docs/contracts/stream#get_admin) | Anyone (read-only) | `NotInitialized` | — |
+| [`get_vault`](/docs/contracts/stream#get_vault) | Anyone (read-only) | `NotInitialized` | — |
+| [`pause`](/docs/contracts/stream#pause) | Stream admin | `NotInitialized` | `pause` |
+| [`unpause`](/docs/contracts/stream#unpause) | Stream admin | `NotInitialized` | `unpause` |
+| [`is_paused`](/docs/contracts/stream#is_paused) | Anyone (read-only) | — | — |
+| [`transfer_admin`](/docs/contracts/stream#transfer_admin) | Current admin **and** new admin (both must sign) | `NotInitialized` | `admin_transfer` |
+
+## Vault contract
+
+| Function | Caller (who must authorize) | Errors it can return | Events emitted |
+|---|---|---|---|
+| [`initialize`](/docs/contracts/vault#initialize) | `admin` | `AlreadyInitialized` | — |
+| [`set_stream_contract`](/docs/contracts/vault#set_stream_contract) | Vault admin | `NotInitialized`, `Unauthorized` | `set_stream_contract` |
+| [`deposit`](/docs/contracts/vault#deposit) | `from` (the token owner, i.e. the stream sender) | `InvalidAmount`, `TokenMismatch`, `MathOverflow`; propagates token-contract errors | `deposit` |
+| [`release`](/docs/contracts/vault#release) | **Stream contract only** (two-step: `caller.require_auth()` + address equality check) | `InvalidAmount`, `NotInitialized`, `Unauthorized`, `TokenMismatch`, `InsufficientBalance`, `MathOverflow` | `release` |
+| [`refund`](/docs/contracts/vault#refund) | **Stream contract only** (same two-step check as `release`) | Same as `release` | `refund` |
+| [`balance_of_stream`](/docs/contracts/vault#balance_of_stream) | Anyone (read-only) | — | — |
+| [`total_locked`](/docs/contracts/vault#total_locked) | Anyone (read-only) | — | — |
+| [`get_stream_contract`](/docs/contracts/vault#get_stream_contract) | Anyone (read-only) | `NotInitialized` | — |
+| [`get_admin`](/docs/contracts/vault#get_admin) | Anyone (read-only) | `NotInitialized` | — |
+
+## Registry contract
+
+<CalloutBox variant="warning" title="Registry data is not authoritative">
+  `register_stream` and `update_stream` require no authorization — anyone can
+  call them. Registry stats and listings can be polluted. Verify claims against
+  the Stream contract directly. See
+  [Security Model: Registry write access is intentionally open](/docs/concepts/security-model#registry-write-access-is-intentionally-open).
+</CalloutBox>
+
+| Function | Caller (who must authorize) | Errors it can return | Events emitted |
+|---|---|---|---|
+| [`initialize`](/docs/contracts/registry#initialize) | `admin` | `AlreadyInitialized` | — |
+| [`register_stream`](/docs/contracts/registry#register_stream) | Anyone — no caller check | `AlreadyRegistered`, `InvalidAmount`, `MathOverflow` | `register` |
+| [`update_stream`](/docs/contracts/registry#update_stream) | Anyone — no caller check | `StreamNotFound`, `InvalidAmount`, `MathOverflow` | `update` |
+| [`get_all_streams`](/docs/contracts/registry#get_all_streams) | Anyone (read-only) | — | — |
+| [`stream_count`](/docs/contracts/registry#stream_count) | Anyone (read-only) | — | — |
+| [`get_streams_page`](/docs/contracts/registry#get_streams_page) | Anyone (read-only) | — | — |
+| [`get_stream_record`](/docs/contracts/registry#get_stream_record) | Anyone (read-only) | `StreamNotFound` | — |
+| [`get_admin`](/docs/contracts/registry#get_admin) | Anyone (read-only) | `NotInitialized` | — |
+| [`get_stats`](/docs/contracts/registry#get_stats) | Anyone (read-only) | — | — |
+| [`get_active_streams`](/docs/contracts/registry#get_active_streams) | Anyone (read-only) | — | — |
