@@ -39,6 +39,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     ),
     Figure,
     Details,
+    StreamingCalculator,
     ...components,
   };
 }
