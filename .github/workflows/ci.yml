@@ -44,6 +44,23 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+      - name: Build output size report
+        run: |
+          echo "## Docs build output size" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -d .next ]; then
+            TOTAL=$(du -sh .next | cut -f1)
+            echo "Total \`.next\` size: **${TOTAL}**" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Directory | Size |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+            du -sh .next/* 2>/dev/null | sort -rh | head -10 | while read -r size path; do
+              echo "| \`${path}\` | ${size} |" >> "$GITHUB_STEP_SUMMARY"
+            done
+          else
+            echo "No \`.next\` directory found; skipping size report." >> "$GITHUB_STEP_SUMMARY"
+          fi
+        continue-on-error: true
       - run: npm run check-links
       - run: npm run check-nav
       - run: npm run check-metadata

@@ -1,5 +1,8 @@
 # Contributing to Stellar Stream Hive API
 
+By participating in this project you agree to abide by our
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
 > **Scope of this repository: contributors work in `docs/` only.**
 >
 > This repository hosts both the Rust indexer API (`api/`) and its
@@ -29,7 +32,9 @@
 ## What we don't want
 
 - New pages that duplicate content covered elsewhere -- open an issue first if
-  you think something is missing, so we can agree on where it belongs.
+  you think something is missing, so we can agree on where it belongs. Use the
+  ["Propose a new docs page"](.github/ISSUE_TEMPLATE/docs_proposal.md) issue
+  template for this.
 - Speculative documentation for contract behavior that doesn't exist yet.
   Contract addresses and deployment details are placeholders until the
   contracts repo actually deploys (see
